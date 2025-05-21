@@ -1,0 +1,52 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String   @id
+  telegramId    String   @unique
+  username      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  filters       Filter[]
+  tokenAlerts   TokenAlert[]
+}
+
+model Filter {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  minMarketCap      Float?
+  maxMarketCap      Float?
+  minLiquidity      Float?
+  maxLiquidity      Float?
+  minHolders        Int?
+  maxHolders        Int?
+  maxDevTokens      Float?
+  minContractAge    Int?     // in minutes
+  tradingEnabled    Boolean?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model TokenAlert {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  tokenAddress    String
+  tokenName       String
+  tokenSymbol     String
+  marketCap       Float
+  liquidity       Float
+  fdv             Float
+  holdersCount    Int
+  tradingEnabled  Boolean
+  contractAge     Int      // in minutes
+  createdAt       DateTime @default(now())
+} 
