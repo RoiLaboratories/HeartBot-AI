@@ -1197,8 +1197,33 @@ export class TelegramService {
         // In production, use webhooks
         console.log('[DEBUG] Setting up webhook mode');
         const webhookUrl = `${process.env.VERCEL_URL || 'https://your-vercel-url.vercel.app'}/webhook`;
-        await this.bot.telegram.setWebhook(webhookUrl);
-        console.log('[DEBUG] Webhook set to:', webhookUrl);
+        
+        // Add retry mechanism for webhook setup
+        let retryCount = 0;
+        const maxRetries = 5;
+        const baseDelay = 1000; // 1 second base delay
+        
+        while (retryCount < maxRetries) {
+          try {
+            await this.bot.telegram.setWebhook(webhookUrl);
+            console.log('[DEBUG] Webhook set to:', webhookUrl);
+            break;
+          } catch (error: any) {
+            if (error.response?.error_code === 429) {
+              const retryAfter = error.response.parameters?.retry_after || 1;
+              const delay = Math.min(baseDelay * Math.pow(2, retryCount), 30000); // Max 30 seconds delay
+              console.log(`[DEBUG] Rate limited. Retrying after ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, delay * 1000));
+              retryCount++;
+            } else {
+              throw error;
+            }
+          }
+        }
+        
+        if (retryCount === maxRetries) {
+          throw new Error('Failed to set webhook after maximum retries');
+        }
       } else {
         // In development, use long polling
         console.log('[DEBUG] Starting long polling mode');
