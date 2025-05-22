@@ -497,13 +497,13 @@ export class TelegramService {
         'Choose the minimum liquidity:';
       const keyboard = Markup.inlineKeyboard([
         [
-          Markup.button.callback('$1K', 'set_min_liquidity:1000'),
           Markup.button.callback('$5K', 'set_min_liquidity:5000'),
-          Markup.button.callback('$10K', 'set_min_liquidity:10000')
+          Markup.button.callback('$10K', 'set_min_liquidity:10000'),
+          Markup.button.callback('$20K', 'set_min_liquidity:20000')
         ],
         [
-          Markup.button.callback('$20K', 'set_min_liquidity:20000'),
           Markup.button.callback('$50K', 'set_min_liquidity:50000'),
+          Markup.button.callback('$100K', 'set_min_liquidity:100000'),
           // Markup.button.callback('Custom', 'set_min_liquidity:custom')
         ],
         [Markup.button.callback('Skip', 'skip_liquidity')]
@@ -1196,50 +1196,20 @@ export class TelegramService {
       if (process.env.NODE_ENV === 'production') {
         // In production, use webhooks
         console.log('[DEBUG] Setting up webhook mode');
-        const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
+        const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
         
-        // Add retry mechanism for webhook setup
-        let retryCount = 0;
-        const maxRetries = 5;
-        const baseDelay = 1000; // 1 second base delay
+        // Delete any existing webhook first
+        await this.bot.telegram.deleteWebhook();
+        console.log('[DEBUG] Deleted existing webhook');
         
-        while (retryCount < maxRetries) {
-          try {
-            // Delete any existing webhook first
-            await this.bot.telegram.deleteWebhook();
-            console.log('[DEBUG] Deleted existing webhook');
-            
-            // Set new webhook
-            await this.bot.telegram.setWebhook(webhookUrl, {
-              allowed_updates: ['message', 'callback_query'],
-              drop_pending_updates: true
-            });
-            console.log('[DEBUG] Webhook set to:', webhookUrl);
-            break;
-          } catch (error: any) {
-            if (error.response?.error_code === 429) {
-              const retryAfter = error.response.parameters?.retry_after || 1;
-              const delay = Math.min(baseDelay * Math.pow(2, retryCount), 30000); // Max 30 seconds delay
-              console.log(`[DEBUG] Rate limited. Retrying after ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, delay * 1000));
-              retryCount++;
-            } else {
-              throw error;
-            }
-          }
-        }
-        
-        if (retryCount === maxRetries) {
-          throw new Error('Failed to set webhook after maximum retries');
-        }
+        // Set new webhook
+        await this.bot.telegram.setWebhook(webhookUrl);
+        console.log('[DEBUG] Webhook set to:', webhookUrl);
       } else {
         // In development, use long polling
         console.log('[DEBUG] Starting long polling mode');
         this.isPolling = true;
-        await this.bot.launch({
-          allowedUpdates: ['message', 'callback_query'],
-          dropPendingUpdates: true
-        });
+        await this.bot.launch();
         console.log('[DEBUG] Telegram bot started using long polling');
         
         // Enable graceful stop
@@ -1275,7 +1245,7 @@ export class TelegramService {
 
   public getWebhookMiddleware() {
     console.log('[DEBUG] Creating webhook middleware');
-    const middleware = this.bot.webhookCallback('/api/webhook');
+    const middleware = this.bot.webhookCallback('/webhook');
     console.log('[DEBUG] Webhook middleware created');
     return middleware;
   }
