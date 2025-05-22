@@ -4,7 +4,6 @@ const requiredEnvVars = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'APIFY_API_TOKEN',
   'MORALIS_API_KEY',
   'BIRDEYE_API_KEY'
 ];
@@ -23,9 +22,6 @@ export const config = {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY!,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  },
-  apify: {
-    token: process.env.APIFY_API_TOKEN || '',
   },
   moralis: {
     apiKey: process.env.MORALIS_API_KEY || '',
