@@ -1184,7 +1184,7 @@ export class TelegramService {
 
       // Check if we're in production (Vercel)
       if (process.env.NODE_ENV === 'production') {
-        console.log('[DEBUG] Running in production mode - skipping long polling');
+        console.log('[DEBUG] Running in production mode - using webhooks');
         this.isPolling = true;
         return;
       }
@@ -1218,6 +1218,7 @@ export class TelegramService {
 
   public async handleUpdate(update: any) {
     try {
+      console.log('[DEBUG] Handling update:', JSON.stringify(update));
       await this.bot.handleUpdate(update);
     } catch (error) {
       console.error('[DEBUG] Error handling update:', error);
