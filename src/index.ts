@@ -234,10 +234,6 @@ export default async function handler(req: any, res: any) {
       // Initialize bot if not already running
       if (!heartBot.isRunning) {
         console.log('[DEBUG] Starting bot...');
-        // Set webhook URL first
-        const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
-        console.log('[DEBUG] Setting webhook URL:', webhookUrl);
-        await heartBot.telegram.setWebhook(webhookUrl);
         await heartBot.start();
       }
       
@@ -245,12 +241,11 @@ export default async function handler(req: any, res: any) {
       const update = req.body;
       console.log('[DEBUG] Processing update:', JSON.stringify(update, null, 2));
       
-      // Use the raw request and response
-      const middleware = heartBot.telegram.getWebhookCallback();
-      await middleware(req.raw, res.raw);
+      // Use the webhook middleware
+      const middleware = heartBot.telegram.getWebhookMiddleware();
+      await middleware(req, res);
       
       console.log('[DEBUG] Update handled successfully');
-      res.status(200).send('OK');
     } catch (error) {
       console.error('[DEBUG] Webhook error:', error);
       res.status(200).send('OK'); // Always return 200 to Telegram

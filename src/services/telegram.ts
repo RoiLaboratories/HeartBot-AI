@@ -1170,6 +1170,11 @@ export class TelegramService {
         let retries = 3;
         while (retries > 0) {
           try {
+            // Delete existing webhook first
+            await this.bot.telegram.deleteWebhook();
+            console.log('[DEBUG] Existing webhook deleted');
+            
+            // Set new webhook
             await this.bot.telegram.setWebhook(webhookUrl, {
               allowed_updates: ['message', 'callback_query'],
               drop_pending_updates: true
