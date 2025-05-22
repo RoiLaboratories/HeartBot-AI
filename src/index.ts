@@ -10,7 +10,7 @@ export class HeartBot {
   public telegram: TelegramService;
   private pumpFun: PumpFunService;
   private server: FastifyInstance;
-  private isRunning: boolean = false;
+  public isRunning: boolean = false;
   private adminClient;
   private monitoringEnabled: Map<string, boolean> = new Map();
 
@@ -224,6 +224,10 @@ process.on('SIGINT', async () => {
 export default async function handler(req: any, res: any) {
   if (req.method === 'POST' && req.url === '/webhook') {
     try {
+      // Initialize bot if not already running
+      if (!heartBot.isRunning) {
+        await heartBot.start();
+      }
       const middleware = heartBot.getWebhookMiddleware();
       await middleware(req, res);
       res.status(200).send('OK');
