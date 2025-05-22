@@ -9,11 +9,11 @@
   "routes": [
     {
       "src": "/webhook",
-      "dest": "src/index.ts"
+      "dest": "/src/index.ts"
     },
     {
       "src": "/(.*)",
-      "dest": "src/index.ts"
+      "dest": "/src/index.ts"
     }
   ]
 } 
