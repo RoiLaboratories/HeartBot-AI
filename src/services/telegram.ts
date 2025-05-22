@@ -1676,4 +1676,8 @@ export class TelegramService {
   public async setWebhook(url: string) {
     await this.bot.telegram.setWebhook(url);
   }
+
+  public async getWebhookInfo() {
+    return await this.bot.telegram.getWebhookInfo();
+  }
 } 

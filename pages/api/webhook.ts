@@ -35,6 +35,11 @@ const WEBHOOK_URL = `https://${WEBHOOK_DOMAIN}/api/webhook`;
         hasBirdeyeKey: !!process.env.BIRDEYE_API_KEY
       });
       
+      // Set webhook URL first
+      await heartBot.telegram.setWebhook(WEBHOOK_URL);
+      console.log('[DEBUG] Webhook URL set successfully');
+      
+      // Then start the bot
       await heartBot.start();
       console.log('[DEBUG] Bot initialized successfully');
     }
@@ -67,11 +72,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Only handle POST requests for Telegram updates
     if (req.method !== 'POST') {
       console.log('[DEBUG] Non-POST request received:', req.method);
+      
+      // Check webhook status
+      const webhookInfo = await heartBot.telegram.getWebhookInfo();
+      console.log('[DEBUG] Current webhook info:', webhookInfo);
+      
       res.status(200).json({ 
         status: 'ok', 
         message: 'Server is running',
         botRunning: heartBot.isRunning,
         webhookUrl: WEBHOOK_URL,
+        webhookInfo: webhookInfo,
         environment: {
           NODE_ENV: process.env.NODE_ENV,
           hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
@@ -98,6 +109,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!heartBot.isRunning) {
       console.log('[DEBUG] Starting bot...');
       try {
+        // Set webhook URL first
+        await heartBot.telegram.setWebhook(WEBHOOK_URL);
+        console.log('[DEBUG] Webhook URL set successfully');
+        
+        // Then start the bot
         await heartBot.start();
         console.log('[DEBUG] Bot started successfully');
       } catch (error) {
