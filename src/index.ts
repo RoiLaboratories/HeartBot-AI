@@ -241,14 +241,15 @@ export default async function handler(req: any, res: any) {
       const update = req.body;
       console.log('[DEBUG] Processing update:', JSON.stringify(update, null, 2));
       
-      // Use the webhook middleware
+      // Use the webhook callback
       const middleware = heartBot.telegram.getWebhookCallback();
       await middleware(req, res);
       
       console.log('[DEBUG] Update handled successfully');
     } catch (error) {
       console.error('[DEBUG] Webhook error:', error);
-      res.status(200).send('OK'); // Always return 200 to Telegram
+      // Always return 200 to Telegram to prevent retries
+      res.status(200).send('OK');
     }
   } else {
     res.status(200).json({ status: 'ok', message: 'Server is running' });
