@@ -81,6 +81,19 @@ export class TelegramService {
 
     // Store instance
     TelegramService.instance = this;
+
+    // Verify token immediately
+    this.verifyToken();
+  }
+
+  private async verifyToken() {
+    try {
+      const botInfo = await this.bot.telegram.getMe();
+      console.log('[DEBUG] Bot token verified successfully:', botInfo);
+    } catch (error) {
+      console.error('[DEBUG] Failed to verify bot token:', error);
+      throw new Error('Invalid bot token or network error');
+    }
   }
 
   private setupAllHandlers() {
