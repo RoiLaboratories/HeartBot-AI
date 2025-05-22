@@ -497,13 +497,13 @@ export class TelegramService {
         'Choose the minimum liquidity:';
       const keyboard = Markup.inlineKeyboard([
         [
+          Markup.button.callback('$1K', 'set_min_liquidity:1000'),
           Markup.button.callback('$5K', 'set_min_liquidity:5000'),
-          Markup.button.callback('$10K', 'set_min_liquidity:10000'),
-          Markup.button.callback('$20K', 'set_min_liquidity:20000')
+          Markup.button.callback('$10K', 'set_min_liquidity:10000')
         ],
         [
+          Markup.button.callback('$20K', 'set_min_liquidity:20000'),
           Markup.button.callback('$50K', 'set_min_liquidity:50000'),
-          Markup.button.callback('$100K', 'set_min_liquidity:100000'),
           // Markup.button.callback('Custom', 'set_min_liquidity:custom')
         ],
         [Markup.button.callback('Skip', 'skip_liquidity')]
