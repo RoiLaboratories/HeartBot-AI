@@ -25,7 +25,7 @@ export class PumpFunService {
         params: {
           limit: 1
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 5000 // Reduced timeout to 5 seconds
       });
 
       console.log('Moralis API Response:', JSON.stringify(response.data, null, 2));
@@ -78,13 +78,15 @@ export class PumpFunService {
       return newTokens;
     } catch (error: any) {
       if (error.code === 'ECONNABORTED') {
-        console.error('Moralis API request timed out');
+        console.error('Moralis API request timed out - this is expected occasionally');
+        return []; // Return empty array instead of throwing
       } else if (error.response) {
         console.error(`Moralis API error: ${error.response.status} - ${error.response.statusText}`);
+        return []; // Return empty array instead of throwing
       } else {
         console.error('Error fetching tokens:', error);
+        return []; // Return empty array instead of throwing
       }
-      return [];
     }
   }
 

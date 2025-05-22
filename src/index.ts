@@ -90,75 +90,72 @@ export class HeartBot {
 
     // Start the monitoring loop in the background
     setInterval(async () => {
-      if (this.isRunning) {
-        try {
-          console.log('[DEBUG] Checking for new tokens...');
-          const newTokens = await this.pumpFun.getNewTokens();
-          console.log(`[DEBUG] Found ${newTokens.length} new tokens`);
-          
-          if (newTokens.length > 0) {
-            console.log('[DEBUG] New tokens found:', newTokens.map(t => t.address).join(', '));
-          }
-          
-          for (const token of newTokens) {
-            try {
-              console.log(`[DEBUG] Processing token: ${token.address}`);
-              console.log('[DEBUG] Token data:', JSON.stringify(token, null, 2));
+      if (!this.isRunning) {
+        console.log('[DEBUG] Monitoring is not running');
+        return;
+      }
 
-              // Get all active filters using admin client
-              const { data: filters, error } = await this.adminClient
-                .from('Filter')
-                .select('*, User!inner(*)')
-                .eq('is_active', true);
+      try {
+        console.log('[DEBUG] Starting token check cycle...');
+        const newTokens = await this.pumpFun.getNewTokens();
+        
+        if (newTokens.length === 0) {
+          console.log('[DEBUG] No new tokens found in this cycle');
+          return;
+        }
 
-              if (error) {
-                console.error('[DEBUG] Error fetching filters:', error);
-                continue;
-              }
+        console.log(`[DEBUG] Processing ${newTokens.length} new tokens`);
+        
+        for (const token of newTokens) {
+          try {
+            console.log(`[DEBUG] Processing token: ${token.address}`);
 
-              console.log(`[DEBUG] Found ${filters.length} active filters to check`);
+            // Get all active filters using admin client
+            const { data: filters, error } = await this.adminClient
+              .from('Filter')
+              .select('*, User!inner(*)')
+              .eq('is_active', true);
 
-              // Check each filter
-              for (const filter of filters) {
+            if (error) {
+              console.error('[DEBUG] Error fetching filters:', error);
+              continue;
+            }
+
+            if (!filters || filters.length === 0) {
+              console.log('[DEBUG] No active filters found');
+              continue;
+            }
+
+            console.log(`[DEBUG] Found ${filters.length} active filters to check`);
+
+            // Check each filter
+            for (const filter of filters) {
+              try {
                 // Only send alerts to users who have monitoring enabled
                 if (!this.monitoringEnabled.get(filter.user_id)) {
                   console.log(`[DEBUG] Monitoring disabled for user ${filter.user_id}`);
                   continue;
                 }
 
-                console.log(`[DEBUG] Checking filter for user ${filter.user_id}:`, {
-                  min_liquidity: filter.min_liquidity,
-                  max_liquidity: filter.max_liquidity,
-                  min_market_cap: filter.min_market_cap,
-                  max_market_cap: filter.max_market_cap
-                });
-
                 const matches = this.matchesFilter(token, filter);
-                console.log(`[DEBUG] Filter match result for user ${filter.user_id}: ${matches}`);
-
                 if (matches) {
                   console.log(`[DEBUG] Token ${token.address} matches filter for user ${filter.user_id}`);
-                  try {
-                    // Send alert to user
-                    await this.telegram.sendTokenAlert(filter.user_id, token);
-                    console.log(`[DEBUG] Alert sent to user ${filter.user_id} for token ${token.address}`);
-                  } catch (error) {
-                    console.error(`[DEBUG] Error sending alert to user ${filter.user_id}:`, error);
-                  }
-                } else {
-                  console.log(`[DEBUG] Token ${token.address} did not match filter for user ${filter.user_id}`);
+                  await this.telegram.sendTokenAlert(filter.user_id, token);
+                  console.log(`[DEBUG] Alert sent to user ${filter.user_id} for token ${token.address}`);
                 }
+              } catch (error) {
+                console.error(`[DEBUG] Error processing filter for user ${filter.user_id}:`, error);
+                continue;
               }
-            } catch (error) {
-              console.error(`[DEBUG] Error processing token ${token.address}:`, error);
-              continue;
             }
+          } catch (error) {
+            console.error(`[DEBUG] Error processing token ${token.address}:`, error);
+            continue;
           }
-        } catch (error) {
-          console.error('[DEBUG] Error in monitoring interval:', error);
         }
-      } else {
-        console.log('[DEBUG] Monitoring is not running');
+      } catch (error) {
+        console.error('[DEBUG] Error in monitoring cycle:', error);
+        // Don't throw the error, just log it and continue
       }
     }, 30000); // Check every 30 seconds
   }
