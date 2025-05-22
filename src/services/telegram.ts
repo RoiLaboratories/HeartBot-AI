@@ -1183,11 +1183,13 @@ export class TelegramService {
       // Check if we're in production (Vercel)
       if (process.env.NODE_ENV === 'production') {
         console.log('[DEBUG] Running in production mode - using webhooks');
+        // Don't start polling in production
         this.isPolling = true;
         return;
       }
 
       // Start long polling only in development
+      console.log('[DEBUG] Starting long polling in development mode');
       this.isPolling = true;
       await this.bot.launch({
         allowedUpdates: ['message', 'callback_query'],
@@ -1218,6 +1220,7 @@ export class TelegramService {
     try {
       console.log('[DEBUG] Handling update:', JSON.stringify(update));
       await this.bot.handleUpdate(update);
+      console.log('[DEBUG] Update handled successfully');
     } catch (error) {
       console.error('[DEBUG] Error handling update:', error);
       throw error;
@@ -1225,7 +1228,10 @@ export class TelegramService {
   }
 
   public getWebhookMiddleware() {
-    return this.bot.webhookCallback('/webhook');
+    console.log('[DEBUG] Creating webhook middleware');
+    const middleware = this.bot.webhookCallback('/webhook');
+    console.log('[DEBUG] Webhook middleware created');
+    return middleware;
   }
 
   private async handleMyFilters(ctx: CustomContext) {

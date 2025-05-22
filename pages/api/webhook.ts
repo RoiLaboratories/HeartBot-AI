@@ -3,18 +3,27 @@ import { heartBot } from '../../src/index';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    console.log('[DEBUG] Webhook request received:', {
+      method: req.method,
+      headers: req.headers,
+      body: req.body
+    });
+
     // Initialize bot if not already running
     if (!heartBot.isRunning) {
       console.log('[DEBUG] Starting bot...');
       await heartBot.start();
+      console.log('[DEBUG] Bot started successfully');
     }
 
     // Handle webhook requests
     if (req.method === 'POST') {
-      console.log('[DEBUG] Received webhook update:', JSON.stringify(req.body));
+      console.log('[DEBUG] Processing webhook update');
       try {
         const middleware = heartBot.telegram.getWebhookMiddleware();
+        console.log('[DEBUG] Got webhook middleware, processing update');
         await middleware(req, res);
+        console.log('[DEBUG] Webhook update processed successfully');
         return;
       } catch (error) {
         console.error('[DEBUG] Error handling webhook update:', error);
@@ -28,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // For GET requests, return status
+    console.log('[DEBUG] Handling GET request');
     res.status(200).json({ 
       status: 'ok', 
       message: 'Webhook endpoint is running',
