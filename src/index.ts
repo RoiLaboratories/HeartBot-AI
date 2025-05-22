@@ -235,6 +235,13 @@ export default async function handler(req: any, res: any) {
       await heartBot.start();
     }
 
+    // Handle webhook requests in production
+    if (process.env.NODE_ENV === 'production' && req.method === 'POST') {
+      const middleware = heartBot.telegram.getWebhookMiddleware();
+      await middleware(req, res);
+      return;
+    }
+
     // For GET requests, return status
     res.status(200).json({ 
       status: 'ok', 

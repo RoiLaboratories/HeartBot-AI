@@ -1182,7 +1182,14 @@ export class TelegramService {
       await this.setupMenu();
       console.log('[DEBUG] Menu setup completed');
 
-      // Start long polling
+      // Check if we're in production (Vercel)
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[DEBUG] Running in production mode - skipping long polling');
+        this.isPolling = true;
+        return;
+      }
+
+      // Start long polling only in development
       this.isPolling = true;
       await this.bot.launch({
         allowedUpdates: ['message', 'callback_query'],
@@ -1204,7 +1211,11 @@ export class TelegramService {
     if (!this.isPolling) {
       return;
     }
-    this.bot.stop();
+
+    // Only stop the bot if we're not in production
+    if (process.env.NODE_ENV !== 'production') {
+      this.bot.stop();
+    }
     this.isPolling = false;
     console.log('Telegram bot stopped');
   }
