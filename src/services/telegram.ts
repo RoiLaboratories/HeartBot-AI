@@ -1185,6 +1185,7 @@ export class TelegramService {
       // Start long polling with proper configuration
       this.isPolling = true;
       await this.bot.launch({
+        allowedUpdates: ['message', 'callback_query'],
         dropPendingUpdates: true
       });
       console.log('[DEBUG] Telegram bot started using long polling');
