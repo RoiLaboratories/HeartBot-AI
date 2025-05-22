@@ -1197,12 +1197,9 @@ export class TelegramService {
         // In production, use webhooks
         console.log('[DEBUG] Setting up webhook mode');
         
-        // Ensure we have the correct URL
-        if (!process.env.VERCEL_URL) {
-          throw new Error('VERCEL_URL environment variable is not set');
-        }
-        
-        const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
+        // Use permanent domain for webhook
+        const webhookDomain = process.env.WEBHOOK_DOMAIN || 'heart-bot-ai.vercel.app';
+        const webhookUrl = `https://${webhookDomain}/api/webhook`;
         console.log('[DEBUG] Setting up webhook with URL:', webhookUrl);
         
         // Add retry logic for webhook setup

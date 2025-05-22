@@ -9,13 +9,17 @@ const requiredEnvVars = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'MORALIS_API_KEY',
   'BIRDEYE_API_KEY',
-  'VERCEL_URL'
+  'WEBHOOK_DOMAIN'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 if (missingEnvVars.length > 0) {
   console.error('[DEBUG] Missing required environment variables:', missingEnvVars);
 }
+
+// Use permanent domain for webhook
+const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN || 'heart-bot-ai.vercel.app';
+const WEBHOOK_URL = `https://${WEBHOOK_DOMAIN}/api/webhook`;
 
 // Initialize bot on module load
 (async () => {
@@ -24,7 +28,7 @@ if (missingEnvVars.length > 0) {
       console.log('[DEBUG] Initializing bot on module load...');
       console.log('[DEBUG] Environment check:', {
         NODE_ENV: process.env.NODE_ENV,
-        VERCEL_URL: process.env.VERCEL_URL,
+        webhookUrl: WEBHOOK_URL,
         hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
         hasSupabaseConfig: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
         hasMoralisKey: !!process.env.MORALIS_API_KEY,
@@ -67,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: 'ok', 
         message: 'Server is running',
         botRunning: heartBot.isRunning,
-        webhookUrl: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/webhook` : 'Not set',
+        webhookUrl: WEBHOOK_URL,
         environment: {
           NODE_ENV: process.env.NODE_ENV,
           hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
