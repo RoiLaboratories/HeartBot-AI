@@ -1193,16 +1193,8 @@ export class TelegramService {
       await this.setupMenu();
       console.log('[DEBUG] Menu setup completed');
 
-      // Check if we're in production (Vercel)
-      if (process.env.NODE_ENV === 'production') {
-        console.log('[DEBUG] Running in production mode - using webhooks');
-        // Don't start polling in production
-        this.isPolling = true;
-        return;
-      }
-
-      // Start long polling only in development
-      console.log('[DEBUG] Starting long polling in development mode');
+      // Start long polling in both environments for testing
+      console.log('[DEBUG] Starting long polling mode');
       this.isPolling = true;
       await this.bot.launch({
         allowedUpdates: ['message', 'callback_query'],
