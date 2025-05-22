@@ -1,16 +1,47 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { heartBot } from '../../src/index';
 
+// Check required environment variables
+const requiredEnvVars = [
+  'TELEGRAM_BOT_TOKEN',
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'MORALIS_API_KEY',
+  'BIRDEYE_API_KEY',
+  'VERCEL_URL'
+];
+
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+if (missingEnvVars.length > 0) {
+  console.error('[DEBUG] Missing required environment variables:', missingEnvVars);
+}
+
 // Initialize bot on module load
 (async () => {
   try {
     if (!heartBot.isRunning) {
       console.log('[DEBUG] Initializing bot on module load...');
+      console.log('[DEBUG] Environment check:', {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL_URL: process.env.VERCEL_URL,
+        hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
+        hasSupabaseConfig: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+        hasMoralisKey: !!process.env.MORALIS_API_KEY,
+        hasBirdeyeKey: !!process.env.BIRDEYE_API_KEY
+      });
+      
       await heartBot.start();
       console.log('[DEBUG] Bot initialized successfully');
     }
   } catch (error) {
     console.error('[DEBUG] Error initializing bot:', error);
+    if (error instanceof Error) {
+      console.error('[DEBUG] Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
   }
 })();
 
@@ -36,7 +67,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: 'ok', 
         message: 'Server is running',
         botRunning: heartBot.isRunning,
-        webhookUrl: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/webhook` : 'Not set'
+        webhookUrl: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/webhook` : 'Not set',
+        environment: {
+          NODE_ENV: process.env.NODE_ENV,
+          hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
+          hasSupabaseConfig: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+          hasMoralisKey: !!process.env.MORALIS_API_KEY,
+          hasBirdeyeKey: !!process.env.BIRDEYE_API_KEY
+        }
       });
       return;
     }
@@ -60,10 +98,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('[DEBUG] Bot started successfully');
       } catch (error) {
         console.error('[DEBUG] Error starting bot:', error);
+        if (error instanceof Error) {
+          console.error('[DEBUG] Error details:', {
+            message: error.message,
+            stack: error.stack
+          });
+        }
         res.status(500).json({ 
           status: 'error', 
           message: 'Failed to start bot',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
+          environment: {
+            NODE_ENV: process.env.NODE_ENV,
+            hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
+            hasSupabaseConfig: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+            hasMoralisKey: !!process.env.MORALIS_API_KEY,
+            hasBirdeyeKey: !!process.env.BIRDEYE_API_KEY
+          }
         });
         return;
       }
@@ -78,6 +129,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     } catch (error) {
       console.error('[DEBUG] Error handling webhook update:', error);
+      if (error instanceof Error) {
+        console.error('[DEBUG] Error details:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
       res.status(500).json({ 
         status: 'error', 
         message: 'Error handling update',
@@ -88,6 +145,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error) {
     console.error('[DEBUG] Error in webhook handler:', error);
+    if (error instanceof Error) {
+      console.error('[DEBUG] Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
     res.status(500).json({ 
       status: 'error', 
       message: 'Internal server error',
