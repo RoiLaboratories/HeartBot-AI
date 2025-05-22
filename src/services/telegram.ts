@@ -89,49 +89,95 @@ export class TelegramService {
   private setupCommands() {
     console.log('[DEBUG] Setting up bot commands');
     
-    // Register command handlers
+    // Register command handlers with error handling
     this.bot.command('start', async (ctx) => {
-      console.log('[DEBUG] Start command received');
-      await this.handleStart(ctx);
+      try {
+        console.log('[DEBUG] Start command received from user:', ctx.from?.id);
+        await this.handleStart(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in start command:', error);
+        await ctx.reply('❌ An error occurred. Please try again later.');
+      }
     });
     
     this.bot.command('setfilter', async (ctx) => {
-      console.log('[DEBUG] SetFilter command received');
-      await this.handleSetFilter(ctx);
+      try {
+        console.log('[DEBUG] SetFilter command received from user:', ctx.from?.id);
+        await this.handleSetFilter(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in setfilter command:', error);
+        await ctx.reply('❌ An error occurred while setting up your filter. Please try again.');
+      }
     });
     
     this.bot.command('myfilters', async (ctx) => {
-      console.log('[DEBUG] MyFilters command received');
-      await this.handleMyFilters(ctx);
+      try {
+        console.log('[DEBUG] MyFilters command received from user:', ctx.from?.id);
+        await this.handleMyFilters(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in myfilters command:', error);
+        await ctx.reply('❌ An error occurred while fetching your filters. Please try again.');
+      }
     });
     
     this.bot.command('deletefilter', async (ctx) => {
-      console.log('[DEBUG] DeleteFilter command received');
-      await this.handleDeleteFilter(ctx);
+      try {
+        console.log('[DEBUG] DeleteFilter command received from user:', ctx.from?.id);
+        await this.handleDeleteFilter(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in deletefilter command:', error);
+        await ctx.reply('❌ An error occurred while deleting your filter. Please try again.');
+      }
     });
     
     this.bot.command('help', async (ctx) => {
-      console.log('[DEBUG] Help command received');
-      await this.handleHelp(ctx);
+      try {
+        console.log('[DEBUG] Help command received from user:', ctx.from?.id);
+        await this.handleHelp(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in help command:', error);
+        await ctx.reply('❌ An error occurred while fetching help. Please try again.');
+      }
     });
     
     this.bot.command('test', async (ctx) => {
-      console.log('[DEBUG] Test command received');
-      await this.handleTest(ctx);
+      try {
+        console.log('[DEBUG] Test command received from user:', ctx.from?.id);
+        await this.handleTest(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in test command:', error);
+        await ctx.reply('❌ An error occurred during testing. Please try again.');
+      }
     });
     
     this.bot.command('fetch', async (ctx) => {
-      console.log('[DEBUG] Fetch command received');
-      await this.handleFetch(ctx);
+      try {
+        console.log('[DEBUG] Fetch command received from user:', ctx.from?.id);
+        await this.handleFetch(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in fetch command:', error);
+        await ctx.reply('❌ An error occurred while starting monitoring. Please try again.');
+      }
     });
     
     this.bot.command('stop', async (ctx) => {
-      console.log('[DEBUG] Stop command received');
-      await this.handleStop(ctx);
+      try {
+        console.log('[DEBUG] Stop command received from user:', ctx.from?.id);
+        await this.handleStop(ctx);
+      } catch (error) {
+        console.error('[DEBUG] Error in stop command:', error);
+        await ctx.reply('❌ An error occurred while stopping monitoring. Please try again.');
+      }
     });
 
     // Register callback query handlers
     this.setupCallbacks();
+    
+    // Add error handler for all updates
+    this.bot.catch((err, ctx) => {
+      console.error('[DEBUG] Bot error:', err);
+      ctx.reply('❌ An error occurred. Please try again later.').catch(console.error);
+    });
     
     console.log('[DEBUG] Bot commands setup completed');
   }
@@ -1198,7 +1244,10 @@ export class TelegramService {
       console.log('[DEBUG] Menu setup completed');
       
       // Start the bot using long polling
-      this.bot.launch();
+      this.bot.launch({
+        allowedUpdates: ['message', 'callback_query'],
+        dropPendingUpdates: true
+      });
       console.log('[DEBUG] Telegram bot started using long polling');
       
       // Enable graceful stop
