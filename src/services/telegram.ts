@@ -1203,7 +1203,7 @@ export class TelegramService {
         }
         
         const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
-        console.log('[DEBUG] Webhook URL:', webhookUrl);
+        console.log('[DEBUG] Setting up webhook with URL:', webhookUrl);
         
         // Add retry logic for webhook setup
         let retryCount = 0;
@@ -1218,7 +1218,8 @@ export class TelegramService {
             
             // Set new webhook
             const webhookResult = await this.bot.telegram.setWebhook(webhookUrl, {
-              allowed_updates: ['message', 'callback_query']
+              allowed_updates: ['message', 'callback_query'],
+              drop_pending_updates: true
             });
             console.log('[DEBUG] Webhook setup result:', webhookResult);
             
@@ -1228,6 +1229,13 @@ export class TelegramService {
             
             if (webhookInfo.url !== webhookUrl) {
               throw new Error(`Webhook URL mismatch. Expected: ${webhookUrl}, Got: ${webhookInfo.url}`);
+            }
+
+            if (webhookInfo.last_error_date) {
+              console.error('[DEBUG] Webhook has errors:', {
+                lastErrorDate: new Date(webhookInfo.last_error_date * 1000),
+                lastErrorMessage: webhookInfo.last_error_message
+              });
             }
             
             break; // Success, exit the retry loop
@@ -1258,7 +1266,8 @@ export class TelegramService {
         console.log('[DEBUG] Starting long polling mode');
         this.isPolling = true;
         await this.bot.launch({
-          allowedUpdates: ['message', 'callback_query']
+          allowedUpdates: ['message', 'callback_query'],
+          dropPendingUpdates: true
         });
         console.log('[DEBUG] Telegram bot started using long polling');
         
@@ -1295,9 +1304,14 @@ export class TelegramService {
 
   public getWebhookMiddleware() {
     console.log('[DEBUG] Creating webhook middleware');
-    const middleware = this.bot.webhookCallback('/api/webhook');
-    console.log('[DEBUG] Webhook middleware created');
-    return middleware;
+    try {
+      const middleware = this.bot.webhookCallback('/api/webhook');
+      console.log('[DEBUG] Webhook middleware created successfully');
+      return middleware;
+    } catch (error) {
+      console.error('[DEBUG] Error creating webhook middleware:', error);
+      throw error;
+    }
   }
 
   private async handleMyFilters(ctx: CustomContext) {
