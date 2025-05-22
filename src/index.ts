@@ -13,6 +13,7 @@ export class HeartBot {
   public isRunning: boolean = false;
   private adminClient;
   private monitoringEnabled: Map<string, boolean> = new Map();
+  private serverStarted: boolean = false;
 
   constructor() {
     this.pumpFun = new PumpFunService();
@@ -43,22 +44,31 @@ export class HeartBot {
   async start() {
     try {
       console.log('[DEBUG] Starting HeartBot...');
+      
       // Start Telegram bot
       await this.telegram.start();
       console.log('[DEBUG] Telegram bot started');
 
-      // Start Fastify server
-      try {
-        console.log('[DEBUG] Starting Fastify server...');
-        const port = Number(process.env.PORT) || Number(config.server.port);
-        await this.server.listen({ 
-          port: port || 3000, 
-          host: '0.0.0.0' 
-        });
-        console.log(`[DEBUG] Server listening on port ${port}`);
-      } catch (err) {
-        console.error('[DEBUG] Error starting server:', err);
-        throw err;
+      // Start Fastify server only if not already started
+      if (!this.serverStarted) {
+        try {
+          console.log('[DEBUG] Starting Fastify server...');
+          const port = Number(process.env.PORT) || Number(config.server.port);
+          await this.server.listen({ 
+            port: port || 3000, 
+            host: '0.0.0.0' 
+          });
+          this.serverStarted = true;
+          console.log(`[DEBUG] Server listening on port ${port}`);
+        } catch (err: any) {
+          if (err.code === 'FST_ERR_REOPENED_SERVER') {
+            console.log('[DEBUG] Server already running');
+            this.serverStarted = true;
+          } else {
+            console.error('[DEBUG] Error starting server:', err);
+            throw err;
+          }
+        }
       }
 
       // Reset last checked timestamp to ensure we get new tokens
