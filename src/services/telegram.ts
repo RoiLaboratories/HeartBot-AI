@@ -1196,7 +1196,7 @@ export class TelegramService {
       if (process.env.NODE_ENV === 'production') {
         // In production, use webhooks
         console.log('[DEBUG] Setting up webhook mode');
-        const webhookUrl = `${process.env.VERCEL_URL || 'https://your-vercel-url.vercel.app'}/webhook`;
+        const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
         
         // Add retry mechanism for webhook setup
         let retryCount = 0;
@@ -1205,7 +1205,15 @@ export class TelegramService {
         
         while (retryCount < maxRetries) {
           try {
-            await this.bot.telegram.setWebhook(webhookUrl);
+            // Delete any existing webhook first
+            await this.bot.telegram.deleteWebhook();
+            console.log('[DEBUG] Deleted existing webhook');
+            
+            // Set new webhook
+            await this.bot.telegram.setWebhook(webhookUrl, {
+              allowed_updates: ['message', 'callback_query'],
+              drop_pending_updates: true
+            });
             console.log('[DEBUG] Webhook set to:', webhookUrl);
             break;
           } catch (error: any) {
@@ -1267,7 +1275,7 @@ export class TelegramService {
 
   public getWebhookMiddleware() {
     console.log('[DEBUG] Creating webhook middleware');
-    const middleware = this.bot.webhookCallback('/webhook');
+    const middleware = this.bot.webhookCallback('/api/webhook');
     console.log('[DEBUG] Webhook middleware created');
     return middleware;
   }
