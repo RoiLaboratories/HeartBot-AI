@@ -48,6 +48,7 @@ export class TelegramService {
   private heartBot: HeartBot;
 
   constructor(heartBot: HeartBot) {
+    console.log('[DEBUG] Initializing Telegram bot with token:', config.telegram.token ? 'Token exists' : 'No token found');
     this.bot = new Telegraf<CustomContext>(config.telegram.token);
     this.heartBot = heartBot;
     // Create a service role client for admin operations
@@ -1108,23 +1109,25 @@ export class TelegramService {
   }
 
   public start() {
+    console.log('[DEBUG] Starting Telegram bot...');
     if (process.env.NODE_ENV === 'production') {
       // In production, use webhook
       const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
+      console.log('[DEBUG] Setting webhook URL:', webhookUrl);
       this.bot.telegram.setWebhook(webhookUrl).then(() => {
-        console.log(`Webhook set to: ${webhookUrl}`);
+        console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
       }).catch(error => {
-        console.error('Error setting webhook:', error);
+        console.error('[DEBUG] Error setting webhook:', error);
       });
     } else {
       // In development, use long polling
       this.setupMenu().then(() => {
         this.bot.launch();
-        console.log('Telegram bot started in development mode');
+        console.log('[DEBUG] Telegram bot started in development mode');
       }).catch(error => {
-        console.error('Error setting up menu:', error);
+        console.error('[DEBUG] Error setting up menu:', error);
         this.bot.launch();
-        console.log('Telegram bot started (with default menu)');
+        console.log('[DEBUG] Telegram bot started (with default menu)');
       });
     }
   }

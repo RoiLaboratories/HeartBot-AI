@@ -224,15 +224,20 @@ process.on('SIGINT', async () => {
 export default async function handler(req: any, res: any) {
   if (req.method === 'POST' && req.url === '/webhook') {
     try {
+      console.log('[DEBUG] Webhook request received');
+      console.log('[DEBUG] Bot token exists:', !!config.telegram.token);
+      
       // Initialize bot if not already running
       if (!heartBot.isRunning) {
+        console.log('[DEBUG] Starting bot...');
         await heartBot.start();
       }
+      
       const middleware = heartBot.getWebhookMiddleware();
       await middleware(req, res);
       res.status(200).send('OK');
     } catch (error) {
-      console.error('Webhook error:', error);
+      console.error('[DEBUG] Webhook error:', error);
       res.status(200).send('OK'); // Always return 200 to Telegram
     }
   } else {
