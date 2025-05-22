@@ -82,6 +82,11 @@ export class HeartBot {
           console.log('[DEBUG] Telegram bot started');
           // Set running state after successful start
           this.isRunning = true;
+          
+          // Start token monitoring in the background
+          console.log('[DEBUG] Starting token monitoring...');
+          this.startTokenMonitoring();
+          console.log('[DEBUG] Token monitoring started');
         } catch (error: any) {
           if (error.response?.error_code === 429) {
             console.log('[DEBUG] Rate limit hit while starting bot, will retry on next request');
@@ -92,9 +97,6 @@ export class HeartBot {
         }
 
         console.log('[DEBUG] HeartBot started successfully');
-
-        // Start token monitoring in the background
-        this.startTokenMonitoring();
       } catch (error) {
         console.error('[DEBUG] Error starting HeartBot:', error);
         this.isRunning = false;
@@ -109,13 +111,20 @@ export class HeartBot {
 
   private startTokenMonitoring() {
     console.log('[DEBUG] Starting token monitoring system...');
+    
+    // Clear any existing interval
+    this.cleanup();
+    
     // Reset last checked timestamp to ensure we get new tokens
     this.pumpFun.resetLastCheckedTimestamp();
 
     // Start the monitoring loop in the background
     const intervalId = setInterval(async () => {
+      console.log('[DEBUG] Monitoring cycle started');
+      console.log('[DEBUG] Bot running status:', this.isRunning);
+      
       if (!this.isRunning) {
-        console.log('[DEBUG] Monitoring is not running');
+        console.log('[DEBUG] Monitoring is not running, skipping cycle');
         return;
       }
 
@@ -126,7 +135,7 @@ export class HeartBot {
       console.log('[DEBUG] Active monitoring users:', activeUsers);
 
       if (activeUsers.length === 0) {
-        console.log('[DEBUG] No users have monitoring enabled');
+        console.log('[DEBUG] No users have monitoring enabled, skipping cycle');
         return;
       }
 
@@ -319,6 +328,13 @@ export class HeartBot {
     console.log(`[DEBUG] Enabling monitoring for user ${userId}`);
     this.monitoringEnabled.set(userId, true);
     console.log(`[DEBUG] Current monitoring state:`, Array.from(this.monitoringEnabled.entries()));
+    
+    // Ensure monitoring is running
+    if (!this.monitoringIntervalId) {
+      console.log('[DEBUG] Monitoring interval not found, restarting monitoring...');
+      this.startTokenMonitoring();
+    }
+    
     // Reset last checked timestamp to ensure we get new tokens
     this.pumpFun.resetLastCheckedTimestamp();
   }
