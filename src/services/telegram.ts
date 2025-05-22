@@ -1208,7 +1208,7 @@ export class TelegramService {
         // Add retry logic for webhook setup
         let retryCount = 0;
         const maxRetries = 3;
-        const baseDelay = 2000; // 2 seconds
+        const baseDelay = 2000;
 
         while (retryCount < maxRetries) {
           try {
