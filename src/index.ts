@@ -45,12 +45,8 @@ export class HeartBot {
     try {
       console.log('[DEBUG] Starting HeartBot...');
       
-      // Start Telegram bot
-      await this.telegram.start();
-      console.log('[DEBUG] Telegram bot started');
-
-      // Start Fastify server only if not already started
-      if (!this.serverStarted) {
+      // Start Fastify server first if in production
+      if (process.env.NODE_ENV === 'production' && !this.serverStarted) {
         try {
           console.log('[DEBUG] Starting Fastify server...');
           const port = Number(process.env.PORT) || Number(config.server.port);
@@ -68,6 +64,19 @@ export class HeartBot {
             console.error('[DEBUG] Error starting server:', err);
             throw err;
           }
+        }
+      }
+      
+      // Start Telegram bot
+      try {
+        await this.telegram.start();
+        console.log('[DEBUG] Telegram bot started');
+      } catch (error: any) {
+        if (error.response?.error_code === 429) {
+          console.log('[DEBUG] Rate limit hit while starting bot, will retry on next request');
+          // Don't throw, just log and continue
+        } else {
+          throw error;
         }
       }
 

@@ -1198,15 +1198,45 @@ export class TelegramService {
         console.log('[DEBUG] Setting up webhook mode');
         const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
         
-        // Delete any existing webhook first
-        await this.bot.telegram.deleteWebhook();
-        console.log('[DEBUG] Deleted existing webhook');
-        
-        // Set new webhook
-        await this.bot.telegram.setWebhook(webhookUrl, {
-          allowed_updates: ['message', 'callback_query']
-        });
-        console.log('[DEBUG] Webhook set to:', webhookUrl);
+        // Add retry logic for webhook setup
+        let retryCount = 0;
+        const maxRetries = 3;
+        const baseDelay = 2000; // 2 seconds
+
+        while (retryCount < maxRetries) {
+          try {
+            // Delete any existing webhook first
+            await this.bot.telegram.deleteWebhook();
+            console.log('[DEBUG] Deleted existing webhook');
+            
+            // Set new webhook
+            await this.bot.telegram.setWebhook(webhookUrl, {
+              allowed_updates: ['message', 'callback_query']
+            });
+            console.log('[DEBUG] Webhook set to:', webhookUrl);
+            break; // Success, exit the retry loop
+          } catch (error: any) {
+            retryCount++;
+            
+            if (error.response?.error_code === 429) {
+              // Rate limit hit, wait for the specified time plus some buffer
+              const retryAfter = (error.response.parameters?.retry_after || 1) * 1000;
+              console.log(`[DEBUG] Rate limit hit, waiting ${retryAfter}ms before retry ${retryCount}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, retryAfter + 1000)); // Add 1 second buffer
+              continue;
+            }
+            
+            if (retryCount === maxRetries) {
+              console.error('[DEBUG] Failed to set webhook after', maxRetries, 'attempts:', error);
+              throw error;
+            }
+            
+            // For other errors, use exponential backoff
+            const delay = baseDelay * Math.pow(2, retryCount - 1);
+            console.log(`[DEBUG] Error setting webhook, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
       } else {
         // In development, use long polling
         console.log('[DEBUG] Starting long polling mode');
