@@ -52,144 +52,62 @@ export class TelegramService {
       throw new Error('Missing required Telegram bot token');
     }
     console.log('[DEBUG] Initializing Telegram bot with token:', config.telegram.token ? 'Token exists' : 'No token found');
-    try {
-      // Ensure token is properly formatted
-      const token = config.telegram.token.trim();
-      if (!token.match(/^\d+:[A-Za-z0-9_-]+$/)) {
-        throw new Error('Invalid bot token format');
-      }
-      this.bot = new Telegraf<CustomContext>(token);
-      this.heartBot = heartBot;
-      
-      // Create a service role client for admin operations
-      if (!config.supabase.url || !config.supabase.serviceRoleKey) {
-        throw new Error('Missing required Supabase configuration');
-      }
-      this.adminClient = createClient(
-        config.supabase.url,
-        config.supabase.serviceRoleKey
-      );
-      this.filterStates = new Map();
-      this.customInputHandlers = new Map();
-      
-      // Setup basic commands first
-      this.setupBasicCommands();
-      
-      // Then setup the rest
-      this.setupCallbacks();
-      this.setupCustomInputMiddleware();
-      
-      console.log('[DEBUG] Bot initialized successfully');
-    } catch (error) {
-      console.error('[DEBUG] Error creating Telegraf instance:', error);
-      throw error;
+    
+    // Ensure token is properly formatted
+    const token = config.telegram.token.trim();
+    if (!token.match(/^\d+:[A-Za-z0-9_-]+$/)) {
+      throw new Error('Invalid bot token format');
     }
+    
+    // Create bot instance
+    this.bot = new Telegraf<CustomContext>(token);
+    this.heartBot = heartBot;
+    
+    // Create a service role client for admin operations
+    if (!config.supabase.url || !config.supabase.serviceRoleKey) {
+      throw new Error('Missing required Supabase configuration');
+    }
+    this.adminClient = createClient(
+      config.supabase.url,
+      config.supabase.serviceRoleKey
+    );
+    
+    this.filterStates = new Map();
+    this.customInputHandlers = new Map();
+    
+    // Setup all handlers
+    this.setupAllHandlers();
   }
 
-  private setupBasicCommands() {
-    // Basic commands that should always work
-    this.bot.command('start', async (ctx) => {
-      console.log('[DEBUG] Start command received from user:', ctx.from?.id);
-      await ctx.reply('Bot is starting...');
-      await this.handleStart(ctx);
-    });
-
-    this.bot.command('help', async (ctx) => {
-      console.log('[DEBUG] Help command received from user:', ctx.from?.id);
-      await this.handleHelp(ctx);
-    });
-
-    // Add a test command
+  private setupAllHandlers() {
+    // Basic commands
+    this.bot.command('start', this.handleStart.bind(this));
+    this.bot.command('help', this.handleHelp.bind(this));
     this.bot.command('ping', async (ctx) => {
-      console.log('[DEBUG] Ping command received from user:', ctx.from?.id);
       await ctx.reply('Pong! Bot is working.');
     });
-  }
 
-  private setupCommands() {
-    console.log('[DEBUG] Setting up bot commands');
+    // Filter commands
+    this.bot.command('setfilter', this.handleSetFilter.bind(this));
+    this.bot.command('myfilters', this.handleMyFilters.bind(this));
+    this.bot.command('deletefilter', this.handleDeleteFilter.bind(this));
     
-    // Register command handlers with error handling
-    this.bot.command('start', async (ctx) => {
-      try {
-        console.log('[DEBUG] Start command received from user:', ctx.from?.id);
-        await this.handleStart(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in start command:', error);
-        await ctx.reply('❌ An error occurred. Please try again later.');
-      }
-    });
-    
-    this.bot.command('setfilter', async (ctx) => {
-      try {
-        console.log('[DEBUG] SetFilter command received from user:', ctx.from?.id);
-        await this.handleSetFilter(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in setfilter command:', error);
-        await ctx.reply('❌ An error occurred while setting up your filter. Please try again.');
-      }
-    });
-    
-    this.bot.command('myfilters', async (ctx) => {
-      try {
-        console.log('[DEBUG] MyFilters command received from user:', ctx.from?.id);
-        await this.handleMyFilters(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in myfilters command:', error);
-        await ctx.reply('❌ An error occurred while fetching your filters. Please try again.');
-      }
-    });
-    
-    this.bot.command('deletefilter', async (ctx) => {
-      try {
-        console.log('[DEBUG] DeleteFilter command received from user:', ctx.from?.id);
-        await this.handleDeleteFilter(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in deletefilter command:', error);
-        await ctx.reply('❌ An error occurred while deleting your filter. Please try again.');
-      }
-    });
-    
-    this.bot.command('test', async (ctx) => {
-      try {
-        console.log('[DEBUG] Test command received from user:', ctx.from?.id);
-        await this.handleTest(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in test command:', error);
-        await ctx.reply('❌ An error occurred during testing. Please try again.');
-      }
-    });
-    
-    this.bot.command('fetch', async (ctx) => {
-      try {
-        console.log('[DEBUG] Fetch command received from user:', ctx.from?.id);
-        await this.handleFetch(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in fetch command:', error);
-        await ctx.reply('❌ An error occurred while starting monitoring. Please try again.');
-      }
-    });
-    
-    this.bot.command('stop', async (ctx) => {
-      try {
-        console.log('[DEBUG] Stop command received from user:', ctx.from?.id);
-        await this.handleStop(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in stop command:', error);
-        await ctx.reply('❌ An error occurred while stopping monitoring. Please try again.');
-      }
-    });
+    // Monitoring commands
+    this.bot.command('fetch', this.handleFetch.bind(this));
+    this.bot.command('stop', this.handleStop.bind(this));
+    this.bot.command('test', this.handleTest.bind(this));
 
-    // Register callback query handlers
+    // Setup callbacks
     this.setupCallbacks();
     
-    // Add error handler for all updates
+    // Setup custom input handling
+    this.setupCustomInputMiddleware();
+    
+    // Global error handler
     this.bot.catch((err, ctx) => {
       console.error('[DEBUG] Bot error:', err);
       ctx.reply('❌ An error occurred. Please try again later.').catch(console.error);
     });
-    
-    console.log('[DEBUG] Bot commands setup completed');
   }
 
   private setupCallbacks() {
@@ -1253,10 +1171,6 @@ export class TelegramService {
       await this.setupMenu();
       console.log('[DEBUG] Menu setup completed');
       
-      // Setup remaining commands
-      this.setupCommands();
-      console.log('[DEBUG] All commands setup completed');
-      
       // Start the bot using long polling
       this.bot.launch({
         allowedUpdates: ['message', 'callback_query'],
@@ -1656,10 +1570,8 @@ export class TelegramService {
   }
 
   public async handleUpdate(update: any) {
-    console.log('[DEBUG] Handling update:', JSON.stringify(update, null, 2));
     try {
       await this.bot.handleUpdate(update);
-      console.log('[DEBUG] Update handled successfully');
     } catch (error) {
       console.error('[DEBUG] Error handling update:', error);
       throw error;

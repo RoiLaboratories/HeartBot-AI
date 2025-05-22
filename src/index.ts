@@ -244,9 +244,17 @@ export default async function handler(req: any, res: any) {
     }
 
     // For long polling, we just need to keep the connection alive
-    res.status(200).json({ status: 'ok', message: 'Server is running' });
+    res.status(200).json({ 
+      status: 'ok', 
+      message: 'Server is running',
+      botRunning: heartBot.isRunning 
+    });
   } catch (error) {
     console.error('[DEBUG] Error in handler:', error);
-    res.status(200).json({ status: 'error', message: 'Internal server error' });
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 } 
