@@ -52,7 +52,19 @@ export class TelegramService {
       throw new Error('Missing required Telegram bot token');
     }
     console.log('[DEBUG] Initializing Telegram bot with token:', config.telegram.token ? 'Token exists' : 'No token found');
-    this.bot = new Telegraf<CustomContext>(config.telegram.token);
+    try {
+      this.bot = new Telegraf<CustomContext>(config.telegram.token);
+      // Test the token immediately
+      this.bot.telegram.getMe().then(botInfo => {
+        console.log('[DEBUG] Bot initialized successfully:', botInfo.username);
+      }).catch(error => {
+        console.error('[DEBUG] Error validating bot token:', error);
+        throw error;
+      });
+    } catch (error) {
+      console.error('[DEBUG] Error creating Telegraf instance:', error);
+      throw error;
+    }
     this.heartBot = heartBot;
     // Create a service role client for admin operations
     if (!config.supabase.url || !config.supabase.serviceRoleKey) {
@@ -1121,10 +1133,15 @@ export class TelegramService {
       const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
       console.log('[DEBUG] Setting webhook URL:', webhookUrl);
       try {
+        // First verify the bot token is valid
+        const botInfo = await this.bot.telegram.getMe();
+        console.log('[DEBUG] Bot token verified, bot info:', botInfo);
+        
+        // Then set the webhook
         await this.bot.telegram.setWebhook(webhookUrl);
         console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
       } catch (error) {
-        console.error('[DEBUG] Error setting webhook:', error);
+        console.error('[DEBUG] Error in start method:', error);
         throw error;
       }
     } else {
