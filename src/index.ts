@@ -97,7 +97,15 @@ export class HeartBot {
 
       try {
         console.log('[DEBUG] Starting token check cycle...');
-        const newTokens = await this.pumpFun.getNewTokens();
+        
+        // Get new tokens
+        let newTokens: TokenData[];
+        try {
+          newTokens = await this.pumpFun.getNewTokens();
+        } catch (error) {
+          console.error('[DEBUG] Error fetching new tokens:', error);
+          return; // Skip this cycle but continue monitoring
+        }
         
         if (newTokens.length === 0) {
           console.log('[DEBUG] No new tokens found in this cycle');
@@ -106,27 +114,36 @@ export class HeartBot {
 
         console.log(`[DEBUG] Processing ${newTokens.length} new tokens`);
         
+        // Get all active filters
+        let filters;
+        try {
+          const { data, error } = await this.adminClient
+            .from('Filter')
+            .select('*, User!inner(*)')
+            .eq('is_active', true);
+
+          if (error) {
+            console.error('[DEBUG] Error fetching filters:', error);
+            return;
+          }
+
+          filters = data;
+        } catch (error) {
+          console.error('[DEBUG] Error fetching filters:', error);
+          return;
+        }
+
+        if (!filters || filters.length === 0) {
+          console.log('[DEBUG] No active filters found');
+          return;
+        }
+
+        console.log(`[DEBUG] Found ${filters.length} active filters to check`);
+
+        // Process each token
         for (const token of newTokens) {
           try {
             console.log(`[DEBUG] Processing token: ${token.address}`);
-
-            // Get all active filters using admin client
-            const { data: filters, error } = await this.adminClient
-              .from('Filter')
-              .select('*, User!inner(*)')
-              .eq('is_active', true);
-
-            if (error) {
-              console.error('[DEBUG] Error fetching filters:', error);
-              continue;
-            }
-
-            if (!filters || filters.length === 0) {
-              console.log('[DEBUG] No active filters found');
-              continue;
-            }
-
-            console.log(`[DEBUG] Found ${filters.length} active filters to check`);
 
             // Check each filter
             for (const filter of filters) {

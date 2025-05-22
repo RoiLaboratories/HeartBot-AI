@@ -16,76 +16,85 @@ export class PumpFunService {
 
   async getNewTokens(): Promise<TokenData[]> {
     try {
-      console.log('Fetching up to 1 tokens from Moralis...');
+      console.log('Fetching new tokens from Moralis...');
       const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
         headers: {
           'X-API-Key': config.moralis.apiKey,
           'Accept': 'application/json'
         },
         params: {
-          limit: 1
+          limit: config.moralis.tokenFetchLimit // Use the configured limit
         },
-        timeout: 5000 // Reduced timeout to 5 seconds
+        timeout: 10000 // Increased timeout to 10 seconds
       });
 
       console.log('Moralis API Response:', JSON.stringify(response.data, null, 2));
 
-      if (!response.data || !response.data.result) {
-        console.log('No tokens found in Moralis response');
+      // Handle both array and object with data property
+      const tokens = Array.isArray(response.data) ? response.data : 
+                    response.data.data ? response.data.data :
+                    response.data.result ? response.data.result : [];
+
+      if (!Array.isArray(tokens)) {
+        console.error('Invalid response format from Moralis API:', response.data);
         return [];
       }
 
-      const tokens = response.data.result;
       console.log(`Found ${tokens.length} tokens from Moralis`);
 
       const newTokens: TokenData[] = [];
 
       for (const token of tokens) {
-        // Skip tokens without required data
-        if (!token.tokenAddress || !token.name || !token.symbol) {
-          console.log(`Skipping invalid token: ${JSON.stringify(token)}`);
+        try {
+          // Skip tokens without required data
+          if (!token.tokenAddress || !token.name || !token.symbol) {
+            console.log(`Skipping invalid token: ${JSON.stringify(token)}`);
+            continue;
+          }
+
+          // Skip tokens without price or liquidity data
+          if (!token.priceUsd || !token.liquidity) {
+            console.log(`Skipping token without price/liquidity: ${token.tokenAddress}`);
+            continue;
+          }
+
+          // Create token data
+          const tokenData: TokenData = {
+            address: token.tokenAddress,
+            name: token.name,
+            symbol: token.symbol,
+            priceUsd: token.priceUsd,
+            marketCap: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
+                      (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
+            liquidity: parseFloat(token.liquidity) || 0,
+            fdv: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
+                 (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
+            holdersCount: 0,
+            tradingEnabled: true,
+            contractAge: 0,
+            devTokensPercentage: 0
+          };
+
+          console.log(`Processing new token: ${tokenData.address}`);
+          newTokens.push(tokenData);
+        } catch (error) {
+          console.error(`Error processing token ${token.tokenAddress}:`, error);
           continue;
         }
-
-        // Skip tokens without price or liquidity data
-        if (!token.priceUsd || !token.liquidity) {
-          console.log(`Skipping token without price/liquidity: ${token.tokenAddress}`);
-          continue;
-        }
-
-        // Create token data
-        const tokenData: TokenData = {
-          address: token.tokenAddress,
-          name: token.name,
-          symbol: token.symbol,
-          priceUsd: token.priceUsd,
-          marketCap: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                    (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
-          liquidity: parseFloat(token.liquidity) || 0,
-          fdv: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-               (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
-          holdersCount: 0,
-          tradingEnabled: true,
-          contractAge: 0,
-          devTokensPercentage: 0
-        };
-
-        console.log(`Processing new token: ${tokenData.address}`);
-        newTokens.push(tokenData);
       }
 
       console.log(`[DEBUG] Found ${newTokens.length} new tokens`);
       return newTokens;
     } catch (error: any) {
       if (error.code === 'ECONNABORTED') {
-        console.error('Moralis API request timed out - this is expected occasionally');
-        return []; // Return empty array instead of throwing
+        console.error('Moralis API request timed out');
+        throw new Error('Moralis API request timed out');
       } else if (error.response) {
         console.error(`Moralis API error: ${error.response.status} - ${error.response.statusText}`);
-        return []; // Return empty array instead of throwing
+        throw new Error(`Moralis API error: ${error.response.status}`);
       } else {
         console.error('Error fetching tokens:', error);
-        return []; // Return empty array instead of throwing
+        throw error;
       }
     }
   }
