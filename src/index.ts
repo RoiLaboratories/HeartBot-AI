@@ -26,6 +26,11 @@ export class HeartBot {
     );
     this.telegram = new TelegramService(this);
 
+    // Add test route
+    this.server.get('/', async (request, reply) => {
+      return { status: 'ok', message: 'Server is running' };
+    });
+
     // Set up webhook endpoint in production
     if (process.env.NODE_ENV === 'production') {
       this.server.post('/webhook', async (request, reply) => {
@@ -37,18 +42,21 @@ export class HeartBot {
 
   async start() {
     try {
+      console.log('[DEBUG] Starting HeartBot...');
       // Start Telegram bot
       await this.telegram.start();
+      console.log('[DEBUG] Telegram bot started');
 
       // Start Fastify server
       try {
+        console.log('[DEBUG] Starting Fastify server...');
         await this.server.listen({ 
           port: Number(process.env.PORT) || config.server.port, 
           host: '0.0.0.0' 
         });
-        console.log(`Server listening on port ${process.env.PORT || config.server.port}`);
+        console.log(`[DEBUG] Server listening on port ${process.env.PORT || config.server.port}`);
       } catch (err) {
-        console.error('Error starting server:', err);
+        console.error('[DEBUG] Error starting server:', err);
         throw err;
       }
 
