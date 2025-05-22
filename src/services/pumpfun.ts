@@ -1,17 +1,13 @@
 import axios from 'axios';
 import { TokenData } from '../types';
-import { DexscreenerService } from './dexscreener';
 import { config } from '../config';
 
 export class PumpFunService {
   private readonly moralisBaseUrl = 'https://solana-gateway.moralis.io';
   private readonly birdeyeBaseUrl = 'https://public-api.birdeye.so';
-  private dexscreener: DexscreenerService;
   private lastCheckedTimestamp: number = 0;
 
-  constructor() {
-    this.dexscreener = new DexscreenerService();
-  }
+  constructor() {}
 
   resetLastCheckedTimestamp() {
     console.log('Resetting last checked timestamp...');
@@ -125,49 +121,43 @@ export class PumpFunService {
 
       console.log(`Found ${tokens.length} tokens from Moralis`);
 
-      const enrichedTokens = await Promise.all(
-        tokens
-          .filter((token: any) => {
-            const isNew = this.isNewToken(token);
-            if (!isNew) {
-              console.log(`Skipping old token: ${token.address}`);
-            }
-            return isNew;
-          })
-          .map(async (token: any) => {
-            try {
-              console.log(`Processing token: ${token.address}`);
-              const dexData = await this.dexscreener.getTokenData(token.address);
-              if (dexData) {
-                // Calculate market cap if not provided
-                const marketCap = dexData.marketCap || 
-                  (dexData.priceUsd ? parseFloat(dexData.priceUsd) * (token.total_supply || 0) : 0);
+      const enrichedTokens = tokens
+        .filter((token: any) => {
+          const isNew = this.isNewToken(token);
+          if (!isNew) {
+            console.log(`Skipping old token: ${token.address}`);
+          }
+          return isNew;
+        })
+        .map((token: any) => {
+          try {
+            console.log(`Processing token: ${token.address}`);
+            const tokenData: TokenData = {
+              address: token.address,
+              name: token.name,
+              symbol: token.symbol,
+              priceUsd: token.priceUsd,
+              marketCap: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
+                        (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
+              liquidity: parseFloat(token.liquidity) || 0,
+              fdv: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
+                   (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
+              holdersCount: 0,
+              tradingEnabled: true,
+              contractAge: 0,
+              devTokensPercentage: 0
+            };
 
-                const tokenData: TokenData = {
-                  address: token.address,
-                  name: token.name || dexData.name,
-                  symbol: token.symbol || dexData.symbol,
-                  priceUsd: dexData.priceUsd,
-                  marketCap,
-                  liquidity: dexData.liquidity,
-                  fdv: dexData.fdv,
-                  holdersCount: dexData.holdersCount,
-                  tradingEnabled: dexData.tradingEnabled,
-                  contractAge: dexData.contractAge,
-                  devTokensPercentage: dexData.devTokensPercentage
-                };
-
-                console.log(`Enriched token data for ${token.address}:`, tokenData);
-                return tokenData;
-              }
-            } catch (error) {
-              console.error(`Error enriching token ${token.address}:`, error);
-            }
+            console.log(`Processed token data for ${token.address}:`, tokenData);
+            return tokenData;
+          } catch (error) {
+            console.error(`Error processing token ${token.address}:`, error);
             return null;
-          })
-      );
+          }
+        })
+        .filter((token): token is TokenData => token !== null);
 
-      return enrichedTokens.filter((token): token is TokenData => token !== null);
+      return enrichedTokens;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 500 && retryCount < 3) {
@@ -213,26 +203,21 @@ export class PumpFunService {
         return [];
       }
 
-      return await Promise.all(
-        response.data.data
-          .filter((token: any) => this.isNewToken(token))
-          .map(async (token: any) => {
-            try {
-              const dexData = await this.dexscreener.getTokenData(token.address);
-              if (dexData) {
-                return {
-                  ...dexData,
-                  address: token.address,
-                  name: token.name || dexData.name,
-                  symbol: token.symbol || dexData.symbol
-                };
-              }
-            } catch (error) {
-              console.error(`Error enriching token ${token.address}:`, error);
-            }
-            return null;
-          })
-      ).then(tokens => tokens.filter((token): token is TokenData => token !== null));
+      return response.data.data
+        .filter((token: any) => this.isNewToken(token))
+        .map((token: any) => ({
+          address: token.address,
+          name: token.name,
+          symbol: token.symbol,
+          priceUsd: token.price || '0',
+          marketCap: token.marketCap || 0,
+          liquidity: token.liquidity || 0,
+          fdv: token.fdv || 0,
+          holdersCount: 0,
+          tradingEnabled: true,
+          contractAge: 0,
+          devTokensPercentage: 0
+        }));
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 404) {
@@ -250,19 +235,17 @@ export class PumpFunService {
   }
 
   private isNewToken(token: any): boolean {
-    const tokenTimestamp = token.created_at || token.timestamp || 0;
+    const tokenTimestamp = token.timestamp || token.createdAt;
     return tokenTimestamp > this.lastCheckedTimestamp;
   }
 
   private filterUniqueTokens(tokens: TokenData[]): TokenData[] {
     const uniqueTokens = new Map<string, TokenData>();
-    
-    for (const token of tokens) {
+    tokens.forEach(token => {
       if (!uniqueTokens.has(token.address)) {
         uniqueTokens.set(token.address, token);
       }
-    }
-
+    });
     return Array.from(uniqueTokens.values());
   }
 

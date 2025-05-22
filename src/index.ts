@@ -3,14 +3,12 @@ import fastify, { FastifyInstance } from 'fastify';
 import { config } from './config';
 import { TelegramService } from './services/telegram';
 import { PumpFunService } from './services/pumpfun';
-import { DexscreenerService } from './services/dexscreener';
 import { TokenData } from './types';
 import { createClient } from '@supabase/supabase-js';
 
 export class HeartBot {
   private telegram: TelegramService;
   private pumpFun: PumpFunService;
-  private dexscreener: DexscreenerService;
   private server: FastifyInstance;
   private isRunning: boolean = false;
   private adminClient;
@@ -18,7 +16,6 @@ export class HeartBot {
 
   constructor() {
     this.pumpFun = new PumpFunService();
-    this.dexscreener = new DexscreenerService();
     this.server = fastify();
     this.adminClient = createClient(
       config.supabase.url,
