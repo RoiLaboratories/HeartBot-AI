@@ -1,9 +1,7 @@
 import { Telegraf, Context, Markup } from 'telegraf';
 import { config } from '../config';
 import { TokenData } from '../types';
-import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
-import { PumpFunService } from '../services/pumpfun';
 // import { DexscreenerService } from '../services/dexscreener';
 import axios from 'axios';
 import { HeartBot } from '../index';
