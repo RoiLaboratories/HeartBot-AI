@@ -14,6 +14,7 @@ export class HeartBot {
   private adminClient;
   private monitoringEnabled: Map<string, boolean> = new Map();
   private serverStarted: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor() {
     this.pumpFun = new PumpFunService();
@@ -42,55 +43,67 @@ export class HeartBot {
   }
 
   async start() {
-    try {
-      console.log('[DEBUG] Starting HeartBot...');
-      
-      // Start Fastify server first if in production
-      if (process.env.NODE_ENV === 'production' && !this.serverStarted) {
-        try {
-          console.log('[DEBUG] Starting Fastify server...');
-          const port = Number(process.env.PORT) || Number(config.server.port);
-          await this.server.listen({ 
-            port: port || 3000, 
-            host: '0.0.0.0' 
-          });
-          this.serverStarted = true;
-          console.log(`[DEBUG] Server listening on port ${port}`);
-        } catch (err: any) {
-          if (err.code === 'FST_ERR_REOPENED_SERVER') {
-            console.log('[DEBUG] Server already running');
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = (async () => {
+      try {
+        console.log('[DEBUG] Starting HeartBot...');
+        
+        // Skip Fastify server in Vercel environment
+        if (process.env.VERCEL) {
+          console.log('[DEBUG] Running in Vercel environment, skipping Fastify server');
+        } else if (process.env.NODE_ENV === 'production' && !this.serverStarted) {
+          try {
+            console.log('[DEBUG] Starting Fastify server...');
+            const port = Number(process.env.PORT) || Number(config.server.port);
+            await this.server.listen({ 
+              port: port || 3000, 
+              host: '0.0.0.0' 
+            });
             this.serverStarted = true;
-          } else {
-            console.error('[DEBUG] Error starting server:', err);
-            throw err;
+            console.log(`[DEBUG] Server listening on port ${port}`);
+          } catch (err: any) {
+            if (err.code === 'FST_ERR_REOPENED_SERVER') {
+              console.log('[DEBUG] Server already running');
+              this.serverStarted = true;
+            } else {
+              console.error('[DEBUG] Error starting server:', err);
+              throw err;
+            }
           }
         }
-      }
-      
-      // Start Telegram bot
-      try {
-        await this.telegram.start();
-        console.log('[DEBUG] Telegram bot started');
-      } catch (error: any) {
-        if (error.response?.error_code === 429) {
-          console.log('[DEBUG] Rate limit hit while starting bot, will retry on next request');
-          // Don't throw, just log and continue
-        } else {
-          throw error;
+        
+        // Start Telegram bot
+        try {
+          await this.telegram.start();
+          console.log('[DEBUG] Telegram bot started');
+          // Set running state after successful start
+          this.isRunning = true;
+        } catch (error: any) {
+          if (error.response?.error_code === 429) {
+            console.log('[DEBUG] Rate limit hit while starting bot, will retry on next request');
+            // Don't throw, just log and continue
+          } else {
+            throw error;
+          }
         }
+
+        console.log('[DEBUG] HeartBot started successfully');
+
+        // Start token monitoring in the background
+        this.startTokenMonitoring();
+      } catch (error) {
+        console.error('[DEBUG] Error starting HeartBot:', error);
+        this.isRunning = false;
+        this.initializationPromise = null;
+        await this.stop();
+        throw error;
       }
+    })();
 
-      // Set running state
-      this.isRunning = true;
-      console.log('[DEBUG] HeartBot started successfully');
-
-      // Start token monitoring in the background
-      this.startTokenMonitoring();
-    } catch (error) {
-      console.error('[DEBUG] Error starting HeartBot:', error);
-      await this.stop();
-      process.exit(1);
-    }
+    return this.initializationPromise;
   }
 
   private startTokenMonitoring() {
@@ -219,9 +232,27 @@ export class HeartBot {
   }
 
   async stop() {
-    this.isRunning = false;
-    await this.telegram.stop();
-    await this.server.close();
+    try {
+      console.log('[DEBUG] Stopping HeartBot...');
+      
+      // Stop Telegram bot
+      if (this.telegram) {
+        await this.telegram.stop();
+      }
+      
+      // Stop Fastify server if running
+      if (this.serverStarted) {
+        await this.server.close();
+        this.serverStarted = false;
+      }
+      
+      this.isRunning = false;
+      this.initializationPromise = null;
+      console.log('[DEBUG] HeartBot stopped successfully');
+    } catch (error) {
+      console.error('[DEBUG] Error stopping HeartBot:', error);
+      throw error;
+    }
   }
 
   // Add methods to control monitoring

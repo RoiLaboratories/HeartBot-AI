@@ -1219,7 +1219,8 @@ export class TelegramService {
             // Set new webhook
             const webhookResult = await this.bot.telegram.setWebhook(webhookUrl, {
               allowed_updates: ['message', 'callback_query'],
-              drop_pending_updates: true
+              drop_pending_updates: true,
+              max_connections: 1 // Limit connections for serverless environment
             });
             console.log('[DEBUG] Webhook setup result:', webhookResult);
             
@@ -1237,6 +1238,10 @@ export class TelegramService {
                 lastErrorMessage: webhookInfo.last_error_message
               });
             }
+            
+            // Set running state even in webhook mode
+            this.isPolling = true;
+            console.log('[DEBUG] Telegram bot started using webhook mode');
             
             break; // Success, exit the retry loop
           } catch (error: any) {

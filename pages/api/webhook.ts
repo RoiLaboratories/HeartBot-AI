@@ -18,50 +18,32 @@ if (missingEnvVars.length > 0) {
 }
 
 // Initialize bot on module load
-let initializationPromise: Promise<void> | null = null;
-
-async function initializeBot() {
-  if (initializationPromise) {
-    return initializationPromise;
-  }
-
-  initializationPromise = (async () => {
-    try {
-      if (!heartBot.isRunning) {
-        console.log('[DEBUG] Initializing bot on module load...');
-        console.log('[DEBUG] Environment check:', {
-          NODE_ENV: process.env.NODE_ENV,
-          VERCEL_URL: process.env.VERCEL_URL,
-          hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
-          hasSupabaseConfig: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
-          hasMoralisKey: !!process.env.MORALIS_API_KEY,
-          hasBirdeyeKey: !!process.env.BIRDEYE_API_KEY
-        });
-        
-        await heartBot.start();
-        console.log('[DEBUG] Bot initialized successfully');
-      }
-    } catch (error) {
-      console.error('[DEBUG] Error initializing bot:', error);
-      if (error instanceof Error) {
-        console.error('[DEBUG] Error details:', {
-          message: error.message,
-          stack: error.stack
-        });
-      }
-      // Reset initialization promise on error
-      initializationPromise = null;
-      throw error;
+(async () => {
+  try {
+    if (!heartBot.isRunning) {
+      console.log('[DEBUG] Initializing bot on module load...');
+      console.log('[DEBUG] Environment check:', {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL_URL: process.env.VERCEL_URL,
+        hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN,
+        hasSupabaseConfig: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+        hasMoralisKey: !!process.env.MORALIS_API_KEY,
+        hasBirdeyeKey: !!process.env.BIRDEYE_API_KEY
+      });
+      
+      await heartBot.start();
+      console.log('[DEBUG] Bot initialized successfully');
     }
-  })();
-
-  return initializationPromise;
-}
-
-// Start initialization immediately
-initializeBot().catch(error => {
-  console.error('[DEBUG] Failed to initialize bot:', error);
-});
+  } catch (error) {
+    console.error('[DEBUG] Error initializing bot:', error);
+    if (error instanceof Error) {
+      console.error('[DEBUG] Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
+  }
+})();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -112,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!heartBot.isRunning) {
       console.log('[DEBUG] Starting bot...');
       try {
-        await initializeBot();
+        await heartBot.start();
         console.log('[DEBUG] Bot started successfully');
       } catch (error) {
         console.error('[DEBUG] Error starting bot:', error);
