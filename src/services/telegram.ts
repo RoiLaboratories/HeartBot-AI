@@ -41,13 +41,19 @@ interface CustomContext extends Context {
 }
 
 export class TelegramService {
-  private bot: Telegraf<CustomContext>;
-  private adminClient;
-  private filterStates: Map<string, FilterState>;
-  private customInputHandlers: Map<string, (ctx: CustomContext) => Promise<void>>;
-  private heartBot: HeartBot;
+  private static instance: TelegramService | null = null;
+  private isPolling: boolean = false;
+  private bot: Telegraf<CustomContext> = null!;
+  private adminClient: ReturnType<typeof createClient> = null!;
+  private filterStates: Map<string, FilterState> = new Map();
+  private customInputHandlers: Map<string, (ctx: CustomContext) => Promise<void>> = new Map();
+  private heartBot: HeartBot = null!;
 
   constructor(heartBot: HeartBot) {
+    if (TelegramService.instance) {
+      return TelegramService.instance;
+    }
+
     if (!config.telegram.token) {
       throw new Error('Missing required Telegram bot token');
     }
@@ -59,7 +65,7 @@ export class TelegramService {
       throw new Error('Invalid bot token format');
     }
     
-    // Create bot instance
+    // Initialize properties
     this.bot = new Telegraf<CustomContext>(token);
     this.heartBot = heartBot;
     
@@ -72,11 +78,11 @@ export class TelegramService {
       config.supabase.serviceRoleKey
     );
     
-    this.filterStates = new Map();
-    this.customInputHandlers = new Map();
-    
     // Setup all handlers
     this.setupAllHandlers();
+
+    // Store instance
+    TelegramService.instance = this;
   }
 
   private setupAllHandlers() {
@@ -1161,6 +1167,11 @@ export class TelegramService {
   }
 
   public async start() {
+    if (this.isPolling) {
+      console.log('[DEBUG] Bot is already polling');
+      return;
+    }
+
     console.log('[DEBUG] Starting Telegram bot...');
     try {
       // Verify bot token is valid
@@ -1170,42 +1181,45 @@ export class TelegramService {
       // Setup menu
       await this.setupMenu();
       console.log('[DEBUG] Menu setup completed');
-      
-      // Start the bot using long polling
-      this.bot.launch({
+
+      // Start long polling
+      this.isPolling = true;
+      await this.bot.launch({
         allowedUpdates: ['message', 'callback_query'],
         dropPendingUpdates: true
       });
       console.log('[DEBUG] Telegram bot started using long polling');
       
       // Enable graceful stop
-      process.once('SIGINT', () => this.bot.stop('SIGINT'));
-      process.once('SIGTERM', () => this.bot.stop('SIGTERM'));
+      process.once('SIGINT', () => this.stop());
+      process.once('SIGTERM', () => this.stop());
     } catch (error) {
+      this.isPolling = false;
       console.error('[DEBUG] Error in start method:', error);
       throw error;
     }
   }
 
   public stop() {
+    if (!this.isPolling) {
+      return;
+    }
     this.bot.stop();
+    this.isPolling = false;
     console.log('Telegram bot stopped');
   }
 
-  // Add webhook handler
+  public async handleUpdate(update: any) {
+    try {
+      await this.bot.handleUpdate(update);
+    } catch (error) {
+      console.error('[DEBUG] Error handling update:', error);
+      throw error;
+    }
+  }
+
   public getWebhookMiddleware() {
-    console.log('[DEBUG] Creating webhook middleware');
-    const middleware = this.bot.webhookCallback('/webhook');
-    return async (req: any, res: any) => {
-      console.log('[DEBUG] Webhook middleware called');
-      try {
-        await middleware(req, res);
-        console.log('[DEBUG] Webhook middleware completed successfully');
-      } catch (error) {
-        console.error('[DEBUG] Webhook middleware error:', error);
-        throw error;
-      }
-    };
+    return this.bot.webhookCallback('/webhook');
   }
 
   private async handleMyFilters(ctx: CustomContext) {
@@ -1567,21 +1581,5 @@ export class TelegramService {
 
   public async setWebhook(url: string) {
     await this.bot.telegram.setWebhook(url);
-  }
-
-  public async handleUpdate(update: any) {
-    try {
-      await this.bot.handleUpdate(update);
-    } catch (error) {
-      console.error('[DEBUG] Error handling update:', error);
-      throw error;
-    }
-  }
-
-  public getWebhookCallback() {
-    console.log('[DEBUG] Creating webhook callback');
-    return this.bot.webhookCallback('/webhook', {
-      secretToken: process.env.TELEGRAM_WEBHOOK_SECRET
-    });
   }
 } 

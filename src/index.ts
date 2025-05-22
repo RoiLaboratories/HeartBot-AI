@@ -225,14 +225,6 @@ export class HeartBot {
 
 // Start the application
 const heartBot = new HeartBot();
-heartBot.start().catch(console.error);
-
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Shutting down...');
-  await heartBot.stop();
-  process.exit(0);
-});
 
 // Export for Vercel
 export default async function handler(req: any, res: any) {
@@ -243,7 +235,7 @@ export default async function handler(req: any, res: any) {
       await heartBot.start();
     }
 
-    // For long polling, we just need to keep the connection alive
+    // For GET requests, return status
     res.status(200).json({ 
       status: 'ok', 
       message: 'Server is running',
