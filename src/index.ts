@@ -235,24 +235,14 @@ export default async function handler(req: any, res: any) {
       await heartBot.start();
     }
 
-    // Handle Telegram updates
-    if (req.method === 'POST' && req.body) {
-      try {
-        await heartBot.telegram.handleUpdate(req.body);
-        res.status(200).json({ status: 'ok' });
-        return;
-      } catch (error) {
-        console.error('[DEBUG] Error handling update:', error);
-        res.status(500).json({ 
-          status: 'error', 
-          message: 'Error handling update',
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-        return;
-      }
+    // Handle webhook requests in production
+    if (process.env.NODE_ENV === 'production' && req.method === 'POST') {
+      const middleware = heartBot.telegram.getWebhookMiddleware();
+      await middleware(req, res);
+      return;
     }
 
-    // Return status for GET requests
+    // For GET requests, return status
     res.status(200).json({ 
       status: 'ok', 
       message: 'Server is running',
