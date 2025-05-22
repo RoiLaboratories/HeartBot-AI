@@ -7,7 +7,7 @@ import { TokenData } from './types';
 import { createClient } from '@supabase/supabase-js';
 
 export class HeartBot {
-  private telegram: TelegramService;
+  public telegram: TelegramService;
   private pumpFun: PumpFunService;
   private server: FastifyInstance;
   private isRunning: boolean = false;
@@ -203,6 +203,10 @@ export class HeartBot {
     console.log(`[DEBUG] Checking monitoring status for user ${userId}: ${enabled}`);
     return enabled;
   }
+
+  getWebhookMiddleware() {
+    return this.telegram.getWebhookMiddleware();
+  }
 }
 
 // Start the application
@@ -214,4 +218,14 @@ process.on('SIGINT', async () => {
   console.log('Shutting down...');
   await heartBot.stop();
   process.exit(0);
-}); 
+});
+
+// Export for Vercel
+export default async function handler(req: any, res: any) {
+  if (req.method === 'POST' && req.url === '/webhook') {
+    const middleware = heartBot.getWebhookMiddleware();
+    await middleware(req, res);
+  } else {
+    res.status(200).json({ status: 'ok', message: 'Server is running' });
+  }
+} 
