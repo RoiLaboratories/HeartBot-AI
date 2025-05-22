@@ -15,6 +15,7 @@ export class HeartBot {
   private monitoringEnabled: Map<string, boolean> = new Map();
   private serverStarted: boolean = false;
   private initializationPromise: Promise<void> | null = null;
+  private monitoringIntervalId: NodeJS.Timeout | undefined;
 
   constructor() {
     this.pumpFun = new PumpFunService();
@@ -107,13 +108,25 @@ export class HeartBot {
   }
 
   private startTokenMonitoring() {
+    console.log('[DEBUG] Starting token monitoring system...');
     // Reset last checked timestamp to ensure we get new tokens
     this.pumpFun.resetLastCheckedTimestamp();
 
     // Start the monitoring loop in the background
-    setInterval(async () => {
+    const intervalId = setInterval(async () => {
       if (!this.isRunning) {
         console.log('[DEBUG] Monitoring is not running');
+        return;
+      }
+
+      // Log active monitoring users
+      const activeUsers = Array.from(this.monitoringEnabled.entries())
+        .filter(([_, enabled]) => enabled)
+        .map(([userId]) => userId);
+      console.log('[DEBUG] Active monitoring users:', activeUsers);
+
+      if (activeUsers.length === 0) {
+        console.log('[DEBUG] No users have monitoring enabled');
         return;
       }
 
@@ -128,7 +141,9 @@ export class HeartBot {
 
         while (retryCount < maxRetries) {
           try {
+            console.log('[DEBUG] Attempting to fetch new tokens...');
             newTokens = await this.pumpFun.getNewTokens();
+            console.log(`[DEBUG] Successfully fetched ${newTokens.length} new tokens`);
             break; // Success, exit retry loop
           } catch (error: any) {
             retryCount++;
@@ -234,6 +249,10 @@ export class HeartBot {
         // Don't throw the error, just log it and continue
       }
     }, 60000); // Check every 60 seconds instead of 30 to avoid rate limits
+
+    // Store interval ID for cleanup
+    this.monitoringIntervalId = intervalId;
+    console.log('[DEBUG] Token monitoring system started successfully');
   }
 
   private matchesFilter(token: TokenData, filter: any): boolean {
@@ -283,6 +302,9 @@ export class HeartBot {
         this.serverStarted = false;
       }
       
+      // Cleanup monitoring
+      this.cleanup();
+      
       this.isRunning = false;
       this.initializationPromise = null;
       console.log('[DEBUG] HeartBot stopped successfully');
@@ -315,6 +337,14 @@ export class HeartBot {
 
   getWebhookMiddleware() {
     return this.telegram.getWebhookMiddleware();
+  }
+
+  // Add cleanup method
+  private cleanup() {
+    if (this.monitoringIntervalId) {
+      clearInterval(this.monitoringIntervalId);
+      this.monitoringIntervalId = undefined;
+    }
   }
 }
 
