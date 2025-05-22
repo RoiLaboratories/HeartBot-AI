@@ -1468,42 +1468,71 @@ export class TelegramService {
         return;
       }
 
-      // Get latest tokens directly from Moralis
-      const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
-        headers: {
-          'X-API-Key': config.moralis.apiKey,
-          'Accept': 'application/json'
-        },
-        params: {
-          limit: 10
-        },
-        timeout: 10000 // 10 second timeout
-      });
+      // Add retry logic for Moralis API
+      let retryCount = 0;
+      const maxRetries = 3;
+      const baseDelay = 2000;
+      let tokens = [];
 
-      console.log('Raw Moralis API Response:', response.data);
-      console.log('Response type:', typeof response.data);
-      console.log('Is Array?', Array.isArray(response.data));
+      while (retryCount < maxRetries) {
+        try {
+          // Get latest tokens directly from Moralis
+          const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
+            headers: {
+              'X-API-Key': config.moralis.apiKey,
+              'Accept': 'application/json'
+            },
+            params: {
+              limit: 10
+            },
+            timeout: 10000 // 10 second timeout
+          });
 
-      if (!response.data) {
-        await ctx.reply('❌ Empty response from Moralis API');
-        return;
-      }
+          console.log('Raw Moralis API Response:', response.data);
+          console.log('Response type:', typeof response.data);
+          console.log('Is Array?', Array.isArray(response.data));
 
-      // Handle both array and object with data property
-      const tokens = Array.isArray(response.data) ? response.data : 
-                    response.data.data ? response.data.data :
-                    response.data.result ? response.data.result : [];
+          if (!response.data) {
+            throw new Error('Empty response from Moralis API');
+          }
 
-      console.log('Processed tokens:', tokens);
-      console.log('Number of tokens:', tokens.length);
+          // Handle both array and object with data property
+          tokens = Array.isArray(response.data) ? response.data : 
+                  response.data.data ? response.data.data :
+                  response.data.result ? response.data.result : [];
 
-      if (!Array.isArray(tokens)) {
-        await ctx.reply('❌ Invalid response format from Moralis API');
-        return;
+          if (!Array.isArray(tokens)) {
+            throw new Error('Invalid response format from Moralis API');
+          }
+
+          // If we get here, the request was successful
+          break;
+        } catch (error: any) {
+          retryCount++;
+          
+          if (error.response?.status === 429) {
+            // Rate limit hit, wait for the specified time plus some buffer
+            const retryAfter = (error.response.headers['retry-after'] || 1) * 1000;
+            console.log(`[DEBUG] Rate limit hit, waiting ${retryAfter}ms before retry ${retryCount}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, retryAfter + 1000)); // Add 1 second buffer
+            continue;
+          }
+          
+          if (retryCount === maxRetries) {
+            console.error('[DEBUG] Failed to fetch tokens after', maxRetries, 'attempts:', error);
+            await ctx.reply('⚠️ Unable to fetch new tokens from Moralis API. Testing with existing data...');
+            break;
+          }
+          
+          // For other errors, use exponential backoff
+          const delay = baseDelay * Math.pow(2, retryCount - 1);
+          console.log(`[DEBUG] Error fetching tokens, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
 
       // Filter out invalid tokens
-      const validTokens = tokens.filter(token => token && token.tokenAddress);
+      const validTokens = tokens.filter((token: { tokenAddress?: string }) => token && token.tokenAddress);
       
       if (validTokens.length === 0) {
         await ctx.reply('❌ No valid tokens found in the response');

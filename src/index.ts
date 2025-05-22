@@ -120,13 +120,37 @@ export class HeartBot {
       try {
         console.log('[DEBUG] Starting token check cycle...');
         
-        // Get new tokens
-        let newTokens: TokenData[];
-        try {
-          newTokens = await this.pumpFun.getNewTokens();
-        } catch (error) {
-          console.error('[DEBUG] Error fetching new tokens:', error);
-          return; // Skip this cycle but continue monitoring
+        // Get new tokens with retry logic
+        let newTokens: TokenData[] = [];
+        let retryCount = 0;
+        const maxRetries = 3;
+        const baseDelay = 2000;
+
+        while (retryCount < maxRetries) {
+          try {
+            newTokens = await this.pumpFun.getNewTokens();
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            retryCount++;
+            
+            if (error.response?.status === 429) {
+              // Rate limit hit, wait for the specified time plus some buffer
+              const retryAfter = (error.response.headers['retry-after'] || 1) * 1000;
+              console.log(`[DEBUG] Rate limit hit, waiting ${retryAfter}ms before retry ${retryCount}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, retryAfter + 1000)); // Add 1 second buffer
+              continue;
+            }
+            
+            if (retryCount === maxRetries) {
+              console.error('[DEBUG] Failed to fetch tokens after', maxRetries, 'attempts:', error);
+              return; // Skip this cycle
+            }
+            
+            // For other errors, use exponential backoff
+            const delay = baseDelay * Math.pow(2, retryCount - 1);
+            console.log(`[DEBUG] Error fetching tokens, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
         }
         
         if (newTokens.length === 0) {
@@ -167,12 +191,25 @@ export class HeartBot {
           try {
             console.log(`[DEBUG] Processing token: ${token.address}`);
 
+            // Validate token data
+            if (!token.liquidity || !token.marketCap) {
+              console.log(`[DEBUG] Skipping invalid token data for ${token.address}`);
+              continue;
+            }
+
             // Check each filter
             for (const filter of filters) {
               try {
                 // Only send alerts to users who have monitoring enabled
                 if (!this.monitoringEnabled.get(filter.user_id)) {
                   console.log(`[DEBUG] Monitoring disabled for user ${filter.user_id}`);
+                  continue;
+                }
+
+                // Skip filters that require Dexscreener data
+                if (filter.min_holders || filter.max_holders || 
+                    filter.max_dev_tokens || filter.min_contract_age) {
+                  console.log(`[DEBUG] Skipping filter for ${token.address} - requires Dexscreener data`);
                   continue;
                 }
 
@@ -196,7 +233,7 @@ export class HeartBot {
         console.error('[DEBUG] Error in monitoring cycle:', error);
         // Don't throw the error, just log it and continue
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check every 60 seconds instead of 30 to avoid rate limits
   }
 
   private matchesFilter(token: TokenData, filter: any): boolean {

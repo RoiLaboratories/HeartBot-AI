@@ -16,7 +16,7 @@ export class PumpFunService {
 
   async getNewTokens(): Promise<TokenData[]> {
     try {
-      console.log('Fetching new tokens from Moralis...');
+      console.log('[DEBUG] Fetching new tokens from Moralis...');
       const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
         headers: {
           'X-API-Key': config.moralis.apiKey,
@@ -25,10 +25,10 @@ export class PumpFunService {
         params: {
           limit: config.moralis.tokenFetchLimit // Use the configured limit
         },
-        timeout: 10000 // Increased timeout to 10 seconds
+        timeout: 10000 // 10 second timeout
       });
 
-      console.log('Moralis API Response:', JSON.stringify(response.data, null, 2));
+      console.log('[DEBUG] Moralis API Response:', JSON.stringify(response.data, null, 2));
 
       // Handle both array and object with data property
       const tokens = Array.isArray(response.data) ? response.data : 
@@ -36,11 +36,11 @@ export class PumpFunService {
                     response.data.result ? response.data.result : [];
 
       if (!Array.isArray(tokens)) {
-        console.error('Invalid response format from Moralis API:', response.data);
+        console.error('[DEBUG] Invalid response format from Moralis API:', response.data);
         return [];
       }
 
-      console.log(`Found ${tokens.length} tokens from Moralis`);
+      console.log(`[DEBUG] Found ${tokens.length} tokens from Moralis`);
 
       const newTokens: TokenData[] = [];
 
@@ -48,13 +48,25 @@ export class PumpFunService {
         try {
           // Skip tokens without required data
           if (!token.tokenAddress || !token.name || !token.symbol) {
-            console.log(`Skipping invalid token: ${JSON.stringify(token)}`);
+            console.log(`[DEBUG] Skipping invalid token: ${JSON.stringify(token)}`);
             continue;
           }
 
           // Skip tokens without price or liquidity data
           if (!token.priceUsd || !token.liquidity) {
-            console.log(`Skipping token without price/liquidity: ${token.tokenAddress}`);
+            console.log(`[DEBUG] Skipping token without price/liquidity: ${token.tokenAddress}`);
+            continue;
+          }
+
+          // Parse numeric values
+          const priceUsd = parseFloat(token.priceUsd);
+          const liquidity = parseFloat(token.liquidity);
+          const fdv = token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
+                     (priceUsd && liquidity ? priceUsd * liquidity : 0);
+
+          // Skip if any required numeric values are invalid
+          if (isNaN(priceUsd) || isNaN(liquidity) || isNaN(fdv)) {
+            console.log(`[DEBUG] Skipping token with invalid numeric values: ${token.tokenAddress}`);
             continue;
           }
 
@@ -63,37 +75,35 @@ export class PumpFunService {
             address: token.tokenAddress,
             name: token.name,
             symbol: token.symbol,
-            priceUsd: token.priceUsd,
-            marketCap: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                      (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
-            liquidity: parseFloat(token.liquidity) || 0,
-            fdv: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                 (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
+            priceUsd: priceUsd.toString(),
+            marketCap: fdv,
+            liquidity: liquidity,
+            fdv: fdv,
             holdersCount: 0,
             tradingEnabled: true,
             contractAge: 0,
             devTokensPercentage: 0
           };
 
-          console.log(`Processing new token: ${tokenData.address}`);
+          console.log(`[DEBUG] Processed new token: ${tokenData.address}`);
           newTokens.push(tokenData);
         } catch (error) {
-          console.error(`Error processing token ${token.tokenAddress}:`, error);
+          console.error(`[DEBUG] Error processing token ${token.tokenAddress}:`, error);
           continue;
         }
       }
 
-      console.log(`[DEBUG] Found ${newTokens.length} new tokens`);
+      console.log(`[DEBUG] Found ${newTokens.length} valid new tokens`);
       return newTokens;
     } catch (error: any) {
       if (error.code === 'ECONNABORTED') {
-        console.error('Moralis API request timed out');
+        console.error('[DEBUG] Moralis API request timed out');
         throw new Error('Moralis API request timed out');
       } else if (error.response) {
-        console.error(`Moralis API error: ${error.response.status} - ${error.response.statusText}`);
-        throw new Error(`Moralis API error: ${error.response.status}`);
+        console.error(`[DEBUG] Moralis API error: ${error.response.status} - ${error.response.statusText}`);
+        throw error; // Let the monitoring system handle retries
       } else {
-        console.error('Error fetching tokens:', error);
+        console.error('[DEBUG] Error fetching tokens:', error);
         throw error;
       }
     }
