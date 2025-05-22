@@ -53,7 +53,12 @@ export class TelegramService {
     }
     console.log('[DEBUG] Initializing Telegram bot with token:', config.telegram.token ? 'Token exists' : 'No token found');
     try {
-      this.bot = new Telegraf<CustomContext>(config.telegram.token);
+      // Ensure token is properly formatted
+      const token = config.telegram.token.trim();
+      if (!token.match(/^\d+:[A-Za-z0-9_-]+$/)) {
+        throw new Error('Invalid bot token format');
+      }
+      this.bot = new Telegraf<CustomContext>(token);
       // Test the token immediately
       this.bot.telegram.getMe().then(botInfo => {
         console.log('[DEBUG] Bot initialized successfully:', botInfo.username);
@@ -1161,12 +1166,23 @@ export class TelegramService {
         const botInfo = await this.bot.telegram.getMe();
         console.log('[DEBUG] Bot token verified, bot info:', botInfo);
         
-        // Then set the webhook
-        await this.bot.telegram.setWebhook(webhookUrl, {
-          allowed_updates: ['message', 'callback_query'],
-          drop_pending_updates: true
-        });
-        console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
+        // Then set the webhook with retry
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            await this.bot.telegram.setWebhook(webhookUrl, {
+              allowed_updates: ['message', 'callback_query'],
+              drop_pending_updates: true
+            });
+            console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
+            break;
+          } catch (error) {
+            retries--;
+            if (retries === 0) throw error;
+            console.log(`[DEBUG] Retrying webhook setup (${retries} attempts left)...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
         
         // Setup commands after webhook is set
         await this.setupMenu();
