@@ -1196,7 +1196,14 @@ export class TelegramService {
       if (process.env.NODE_ENV === 'production') {
         // In production, use webhooks
         console.log('[DEBUG] Setting up webhook mode');
+        
+        // Ensure we have the correct URL
+        if (!process.env.VERCEL_URL) {
+          throw new Error('VERCEL_URL environment variable is not set');
+        }
+        
         const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
+        console.log('[DEBUG] Webhook URL:', webhookUrl);
         
         // Add retry logic for webhook setup
         let retryCount = 0;
@@ -1210,10 +1217,19 @@ export class TelegramService {
             console.log('[DEBUG] Deleted existing webhook');
             
             // Set new webhook
-            await this.bot.telegram.setWebhook(webhookUrl, {
+            const webhookResult = await this.bot.telegram.setWebhook(webhookUrl, {
               allowed_updates: ['message', 'callback_query']
             });
-            console.log('[DEBUG] Webhook set to:', webhookUrl);
+            console.log('[DEBUG] Webhook setup result:', webhookResult);
+            
+            // Verify webhook is set correctly
+            const webhookInfo = await this.bot.telegram.getWebhookInfo();
+            console.log('[DEBUG] Current webhook info:', webhookInfo);
+            
+            if (webhookInfo.url !== webhookUrl) {
+              throw new Error(`Webhook URL mismatch. Expected: ${webhookUrl}, Got: ${webhookInfo.url}`);
+            }
+            
             break; // Success, exit the retry loop
           } catch (error: any) {
             retryCount++;
