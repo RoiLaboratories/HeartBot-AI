@@ -224,7 +224,7 @@ export class HeartBot {
 }
 
 // Start the application
-const heartBot = new HeartBot();
+export const heartBot = new HeartBot();
 
 // Export for Vercel
 export default async function handler(req: any, res: any) {
