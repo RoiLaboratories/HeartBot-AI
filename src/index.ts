@@ -229,6 +229,7 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'POST' && req.url === '/webhook') {
     try {
       console.log('[DEBUG] Webhook request received');
+      console.log('[DEBUG] Request body:', JSON.stringify(req.body, null, 2));
       
       // Initialize bot if not already running
       if (!heartBot.isRunning) {
@@ -240,8 +241,11 @@ export default async function handler(req: any, res: any) {
         await heartBot.start();
       }
       
+      console.log('[DEBUG] Getting webhook middleware...');
       const middleware = heartBot.getWebhookMiddleware();
+      console.log('[DEBUG] Executing webhook middleware...');
       await middleware(req, res);
+      console.log('[DEBUG] Webhook middleware executed successfully');
       res.status(200).send('OK');
     } catch (error) {
       console.error('[DEBUG] Webhook error:', error);

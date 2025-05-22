@@ -1179,7 +1179,18 @@ export class TelegramService {
 
   // Add webhook handler
   public getWebhookMiddleware() {
-    return this.bot.webhookCallback('/webhook');
+    console.log('[DEBUG] Creating webhook middleware');
+    const middleware = this.bot.webhookCallback('/webhook');
+    return async (req: any, res: any) => {
+      console.log('[DEBUG] Webhook middleware called');
+      try {
+        await middleware(req, res);
+        console.log('[DEBUG] Webhook middleware completed successfully');
+      } catch (error) {
+        console.error('[DEBUG] Webhook middleware error:', error);
+        throw error;
+      }
+    };
   }
 
   private async handleMyFilters(ctx: CustomContext) {
