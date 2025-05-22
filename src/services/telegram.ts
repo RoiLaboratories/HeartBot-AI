@@ -88,17 +88,51 @@ export class TelegramService {
 
   private setupCommands() {
     console.log('[DEBUG] Setting up bot commands');
+    
+    // Register command handlers
     this.bot.command('start', async (ctx) => {
-      console.log('[DEBUG] Start command received in setupCommands');
+      console.log('[DEBUG] Start command received');
       await this.handleStart(ctx);
     });
-    this.bot.command('setfilter', this.handleSetFilter.bind(this));
-    this.bot.command('myfilters', this.handleMyFilters.bind(this));
-    this.bot.command('deletefilter', this.handleDeleteFilter.bind(this));
-    this.bot.command('help', this.handleHelp.bind(this));
-    this.bot.command('test', this.handleTest.bind(this));
-    this.bot.command('fetch', this.handleFetch.bind(this));
-    this.bot.command('stop', this.handleStop.bind(this));
+    
+    this.bot.command('setfilter', async (ctx) => {
+      console.log('[DEBUG] SetFilter command received');
+      await this.handleSetFilter(ctx);
+    });
+    
+    this.bot.command('myfilters', async (ctx) => {
+      console.log('[DEBUG] MyFilters command received');
+      await this.handleMyFilters(ctx);
+    });
+    
+    this.bot.command('deletefilter', async (ctx) => {
+      console.log('[DEBUG] DeleteFilter command received');
+      await this.handleDeleteFilter(ctx);
+    });
+    
+    this.bot.command('help', async (ctx) => {
+      console.log('[DEBUG] Help command received');
+      await this.handleHelp(ctx);
+    });
+    
+    this.bot.command('test', async (ctx) => {
+      console.log('[DEBUG] Test command received');
+      await this.handleTest(ctx);
+    });
+    
+    this.bot.command('fetch', async (ctx) => {
+      console.log('[DEBUG] Fetch command received');
+      await this.handleFetch(ctx);
+    });
+    
+    this.bot.command('stop', async (ctx) => {
+      console.log('[DEBUG] Stop command received');
+      await this.handleStop(ctx);
+    });
+
+    // Register callback query handlers
+    this.setupCallbacks();
+    
     console.log('[DEBUG] Bot commands setup completed');
   }
 
@@ -1446,11 +1480,9 @@ export class TelegramService {
             name: token.name || 'Unknown',
             symbol: token.symbol || 'Unknown',
             priceUsd: token.priceUsd,
-            marketCap: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                      (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
-            liquidity: parseFloat(token.liquidity) || 0,
-            fdv: token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                 (token.priceUsd && token.liquidity ? parseFloat(token.priceUsd) * parseFloat(token.liquidity) : 0),
+            marketCap: token.marketCap,
+            liquidity: token.liquidity,
+            fdv: token.fdv,
             holdersCount: 0, // Not available from Moralis
             tradingEnabled: true, // Assume trading is enabled for new tokens
             contractAge: 0, // Not available from Moralis
@@ -1615,6 +1647,9 @@ export class TelegramService {
   }
 
   public getWebhookCallback() {
-    return this.bot.webhookCallback('/webhook');
+    console.log('[DEBUG] Creating webhook callback');
+    return this.bot.webhookCallback('/webhook', {
+      secretToken: process.env.TELEGRAM_WEBHOOK_SECRET
+    });
   }
 } 

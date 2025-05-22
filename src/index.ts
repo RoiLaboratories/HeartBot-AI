@@ -242,7 +242,7 @@ export default async function handler(req: any, res: any) {
       console.log('[DEBUG] Processing update:', JSON.stringify(update, null, 2));
       
       // Use the webhook middleware
-      const middleware = heartBot.telegram.getWebhookMiddleware();
+      const middleware = heartBot.telegram.getWebhookCallback();
       await middleware(req, res);
       
       console.log('[DEBUG] Update handled successfully');
