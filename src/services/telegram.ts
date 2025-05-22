@@ -1188,65 +1188,31 @@ export class TelegramService {
 
   public async start() {
     console.log('[DEBUG] Starting Telegram bot...');
-    if (process.env.NODE_ENV === 'production') {
-      // In production, use webhook
-      if (!process.env.VERCEL_URL) {
-        throw new Error('VERCEL_URL environment variable is not set');
-      }
-      const webhookUrl = `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, '')}/webhook`;
-      console.log('[DEBUG] Setting webhook URL:', webhookUrl);
-      try {
-        // First verify the bot token is valid
-        const botInfo = await this.bot.telegram.getMe();
-        console.log('[DEBUG] Bot token verified, bot info:', botInfo);
-        
-        // Delete any existing webhook
-        await this.bot.telegram.deleteWebhook();
-        console.log('[DEBUG] Existing webhook deleted');
-        
-        // Set new webhook
-        await this.bot.telegram.setWebhook(webhookUrl, {
-          allowed_updates: ['message', 'callback_query'],
-          drop_pending_updates: true
-        });
-        console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
-        
-        // Setup commands after webhook is set
-        await this.setupMenu();
-        console.log('[DEBUG] Menu setup completed');
-        
-        // Verify webhook was set correctly
-        const webhookInfo = await this.bot.telegram.getWebhookInfo();
-        console.log('[DEBUG] Webhook info:', webhookInfo);
-        
-        if (webhookInfo.url !== webhookUrl) {
-          throw new Error('Webhook URL mismatch');
-        }
-      } catch (error) {
-        console.error('[DEBUG] Error in start method:', error);
-        throw error;
-      }
-    } else {
-      // In development, use long polling
+    try {
+      // Verify bot token is valid
+      const botInfo = await this.bot.telegram.getMe();
+      console.log('[DEBUG] Bot token verified, bot info:', botInfo);
+      
+      // Setup commands and menu
       await this.setupMenu();
+      console.log('[DEBUG] Menu setup completed');
+      
+      // Start the bot using long polling
       this.bot.launch();
-      console.log('[DEBUG] Telegram bot started in development mode');
+      console.log('[DEBUG] Telegram bot started using long polling');
+      
+      // Enable graceful stop
+      process.once('SIGINT', () => this.bot.stop('SIGINT'));
+      process.once('SIGTERM', () => this.bot.stop('SIGTERM'));
+    } catch (error) {
+      console.error('[DEBUG] Error in start method:', error);
+      throw error;
     }
   }
 
   public stop() {
-    if (process.env.NODE_ENV === 'production') {
-      // In production, delete webhook
-      this.bot.telegram.deleteWebhook().then(() => {
-        console.log('Webhook deleted');
-      }).catch(error => {
-        console.error('Error deleting webhook:', error);
-      });
-    } else {
-      // In development, stop long polling
-      this.bot.stop();
-      console.log('Telegram bot stopped');
-    }
+    this.bot.stop();
+    console.log('Telegram bot stopped');
   }
 
   // Add webhook handler

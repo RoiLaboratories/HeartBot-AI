@@ -226,32 +226,17 @@ process.on('SIGINT', async () => {
 
 // Export for Vercel
 export default async function handler(req: any, res: any) {
-  if (req.method === 'POST' && req.url === '/webhook') {
-    try {
-      console.log('[DEBUG] Webhook request received');
-      console.log('[DEBUG] Request body:', JSON.stringify(req.body, null, 2));
-      
-      // Initialize bot if not already running
-      if (!heartBot.isRunning) {
-        console.log('[DEBUG] Starting bot...');
-        await heartBot.start();
-      }
-      
-      // Handle the update directly
-      const update = req.body;
-      console.log('[DEBUG] Processing update:', JSON.stringify(update, null, 2));
-      
-      // Use the webhook callback
-      const middleware = heartBot.telegram.getWebhookCallback();
-      await middleware(req, res);
-      
-      console.log('[DEBUG] Update handled successfully');
-    } catch (error) {
-      console.error('[DEBUG] Webhook error:', error);
-      // Always return 200 to Telegram to prevent retries
-      res.status(200).send('OK');
+  try {
+    // Initialize bot if not already running
+    if (!heartBot.isRunning) {
+      console.log('[DEBUG] Starting bot...');
+      await heartBot.start();
     }
-  } else {
+
+    // For long polling, we just need to keep the connection alive
     res.status(200).json({ status: 'ok', message: 'Server is running' });
+  } catch (error) {
+    console.error('[DEBUG] Error in handler:', error);
+    res.status(200).json({ status: 'error', message: 'Internal server error' });
   }
 } 
