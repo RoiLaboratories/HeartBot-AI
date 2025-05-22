@@ -1555,4 +1555,15 @@ export class TelegramService {
   public async setWebhook(url: string) {
     await this.bot.telegram.setWebhook(url);
   }
+
+  public async handleUpdate(update: any) {
+    console.log('[DEBUG] Handling update:', JSON.stringify(update, null, 2));
+    try {
+      await this.bot.handleUpdate(update);
+      console.log('[DEBUG] Update handled successfully');
+    } catch (error) {
+      console.error('[DEBUG] Error handling update:', error);
+      throw error;
+    }
+  }
 } 

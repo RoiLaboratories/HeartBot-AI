@@ -244,8 +244,15 @@ export default async function handler(req: any, res: any) {
       console.log('[DEBUG] Getting webhook middleware...');
       const middleware = heartBot.getWebhookMiddleware();
       console.log('[DEBUG] Executing webhook middleware...');
-      await middleware(req, res);
-      console.log('[DEBUG] Webhook middleware executed successfully');
+      
+      // Create a proper request object for Telegraf
+      const update = req.body;
+      console.log('[DEBUG] Processing update:', JSON.stringify(update, null, 2));
+      
+      // Handle the update directly
+      await heartBot.telegram.handleUpdate(update);
+      console.log('[DEBUG] Update handled successfully');
+      
       res.status(200).send('OK');
     } catch (error) {
       console.error('[DEBUG] Webhook error:', error);
