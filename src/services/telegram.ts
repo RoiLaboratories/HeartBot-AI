@@ -82,7 +82,11 @@ export class TelegramService {
   }
 
   private setupCommands() {
-    this.bot.command('start', this.handleStart.bind(this));
+    console.log('[DEBUG] Setting up bot commands');
+    this.bot.command('start', async (ctx) => {
+      console.log('[DEBUG] Start command received in setupCommands');
+      await this.handleStart(ctx);
+    });
     this.bot.command('setfilter', this.handleSetFilter.bind(this));
     this.bot.command('myfilters', this.handleMyFilters.bind(this));
     this.bot.command('deletefilter', this.handleDeleteFilter.bind(this));
@@ -90,6 +94,7 @@ export class TelegramService {
     this.bot.command('test', this.handleTest.bind(this));
     this.bot.command('fetch', this.handleFetch.bind(this));
     this.bot.command('stop', this.handleStop.bind(this));
+    console.log('[DEBUG] Bot commands setup completed');
   }
 
   private setupCallbacks() {
@@ -181,10 +186,15 @@ export class TelegramService {
   }
 
   private async handleStart(ctx: CustomContext) {
+    console.log('[DEBUG] Start command received');
     const telegramId = ctx.from?.id.toString();
-    if (!telegramId || !ctx.from) return;
+    if (!telegramId || !ctx.from) {
+      console.log('[DEBUG] No telegram ID or from data found');
+      return;
+    }
 
     try {
+      console.log('[DEBUG] Checking if user exists:', telegramId);
       // Check if user exists
       const { data: existingUser, error: fetchError } = await this.adminClient
         .from('User')
@@ -193,10 +203,12 @@ export class TelegramService {
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('[DEBUG] Error fetching user:', fetchError);
         throw fetchError;
       }
 
       if (!existingUser) {
+        console.log('[DEBUG] Creating new user:', telegramId);
         // Insert new user
         const { error: insertError } = await this.adminClient
           .from('User')
@@ -205,17 +217,25 @@ export class TelegramService {
             username: ctx.from.username || null
           });
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('[DEBUG] Error inserting user:', insertError);
+          throw insertError;
+        }
       } else {
+        console.log('[DEBUG] Updating existing user:', telegramId);
         // Update existing user's username if it changed
         const { error: updateError } = await this.adminClient
           .from('User')
           .update({ username: ctx.from.username || null })
           .eq('telegram_id', telegramId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('[DEBUG] Error updating user:', updateError);
+          throw updateError;
+        }
       }
 
+      console.log('[DEBUG] Sending welcome message to user:', telegramId);
       await ctx.reply(
         "🌟 <b>Welcome to HeartBot AI!</b> 🌟\n\n" +
         "I'm your personal Solana token launch monitor on Pump.fun.\n\n" +
@@ -239,8 +259,9 @@ export class TelegramService {
         "🚀 <i>Get started by setting up your first filter!</i>",
         { parse_mode: 'HTML' }
       );
+      console.log('[DEBUG] Welcome message sent successfully');
     } catch (error) {
-      console.error('Error in handleStart:', error);
+      console.error('[DEBUG] Error in handleStart:', error);
       await ctx.reply('❌ Error starting the bot. Please try again later.');
     }
   }
