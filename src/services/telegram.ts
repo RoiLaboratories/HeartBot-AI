@@ -1196,20 +1196,24 @@ export class TelegramService {
       if (process.env.NODE_ENV === 'production') {
         // In production, use webhooks
         console.log('[DEBUG] Setting up webhook mode');
-        const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
+        const webhookUrl = `https://${process.env.VERCEL_URL}/api/webhook`;
         
         // Delete any existing webhook first
         await this.bot.telegram.deleteWebhook();
         console.log('[DEBUG] Deleted existing webhook');
         
         // Set new webhook
-        await this.bot.telegram.setWebhook(webhookUrl);
+        await this.bot.telegram.setWebhook(webhookUrl, {
+          allowed_updates: ['message', 'callback_query']
+        });
         console.log('[DEBUG] Webhook set to:', webhookUrl);
       } else {
         // In development, use long polling
         console.log('[DEBUG] Starting long polling mode');
         this.isPolling = true;
-        await this.bot.launch();
+        await this.bot.launch({
+          allowedUpdates: ['message', 'callback_query']
+        });
         console.log('[DEBUG] Telegram bot started using long polling');
         
         // Enable graceful stop
@@ -1245,7 +1249,7 @@ export class TelegramService {
 
   public getWebhookMiddleware() {
     console.log('[DEBUG] Creating webhook middleware');
-    const middleware = this.bot.webhookCallback('/webhook');
+    const middleware = this.bot.webhookCallback('/api/webhook');
     console.log('[DEBUG] Webhook middleware created');
     return middleware;
   }
