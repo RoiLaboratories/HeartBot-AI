@@ -17,6 +17,9 @@ export class HeartBot {
   constructor() {
     this.pumpFun = new PumpFunService();
     this.server = fastify();
+    if (!config.supabase.url || !config.supabase.serviceRoleKey) {
+      throw new Error('Missing required Supabase configuration');
+    }
     this.adminClient = createClient(
       config.supabase.url,
       config.supabase.serviceRoleKey
@@ -47,11 +50,12 @@ export class HeartBot {
       // Start Fastify server
       try {
         console.log('[DEBUG] Starting Fastify server...');
+        const port = Number(process.env.PORT) || Number(config.server.port);
         await this.server.listen({ 
-          port: Number(process.env.PORT) || config.server.port, 
+          port: port || 3000, 
           host: '0.0.0.0' 
         });
-        console.log(`[DEBUG] Server listening on port ${process.env.PORT || config.server.port}`);
+        console.log(`[DEBUG] Server listening on port ${port}`);
       } catch (err) {
         console.error('[DEBUG] Error starting server:', err);
         throw err;
@@ -225,7 +229,6 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'POST' && req.url === '/webhook') {
     try {
       console.log('[DEBUG] Webhook request received');
-      console.log('[DEBUG] Bot token exists:', !!config.telegram.token);
       
       // Initialize bot if not already running
       if (!heartBot.isRunning) {

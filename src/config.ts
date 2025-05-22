@@ -16,21 +16,20 @@ for (const envVar of requiredEnvVars) {
 
 export const config = {
   telegram: {
-    token: process.env.TELEGRAM_BOT_TOKEN || '',
+    token: process.env.TELEGRAM_BOT_TOKEN
   },
   supabase: {
-    url: process.env.SUPABASE_URL || '',
-    anonKey: process.env.SUPABASE_ANON_KEY!,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    url: process.env.SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
   },
   moralis: {
-    apiKey: process.env.MORALIS_API_KEY || '',
-    tokenFetchLimit: parseInt(process.env.MORALIS_TOKEN_FETCH_LIMIT || '10'), // Default to 10 tokens
+    apiKey: process.env.MORALIS_API_KEY,
+    tokenFetchLimit: 10
   },
   birdeye: {
-    apiKey: process.env.BIRDEYE_API_KEY || '',
+    apiKey: process.env.BIRDEYE_API_KEY
   },
   server: {
-    port: parseInt(process.env.PORT || '3000'),
-  },
+    port: process.env.PORT || 3000
+  }
 }; 

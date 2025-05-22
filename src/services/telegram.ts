@@ -48,10 +48,16 @@ export class TelegramService {
   private heartBot: HeartBot;
 
   constructor(heartBot: HeartBot) {
+    if (!config.telegram.token) {
+      throw new Error('Missing required Telegram bot token');
+    }
     console.log('[DEBUG] Initializing Telegram bot with token:', config.telegram.token ? 'Token exists' : 'No token found');
     this.bot = new Telegraf<CustomContext>(config.telegram.token);
     this.heartBot = heartBot;
     // Create a service role client for admin operations
+    if (!config.supabase.url || !config.supabase.serviceRoleKey) {
+      throw new Error('Missing required Supabase configuration');
+    }
     this.adminClient = createClient(
       config.supabase.url,
       config.supabase.serviceRoleKey
