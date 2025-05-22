@@ -25,7 +25,7 @@ export class PumpFunService {
         params: {
           limit: config.moralis.tokenFetchLimit // Use the configured limit
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 30000 // Increased timeout to 30 seconds
       });
 
       console.log('[DEBUG] Moralis API Response:', JSON.stringify(response.data, null, 2));
