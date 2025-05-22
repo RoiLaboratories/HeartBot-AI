@@ -1130,7 +1130,10 @@ export class TelegramService {
     console.log('[DEBUG] Starting Telegram bot...');
     if (process.env.NODE_ENV === 'production') {
       // In production, use webhook
-      const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
+      if (!process.env.VERCEL_URL) {
+        throw new Error('VERCEL_URL environment variable is not set');
+      }
+      const webhookUrl = `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, '')}/webhook`;
       console.log('[DEBUG] Setting webhook URL:', webhookUrl);
       try {
         // First verify the bot token is valid
@@ -1138,7 +1141,9 @@ export class TelegramService {
         console.log('[DEBUG] Bot token verified, bot info:', botInfo);
         
         // Then set the webhook
-        await this.bot.telegram.setWebhook(webhookUrl);
+        await this.bot.telegram.setWebhook(webhookUrl, {
+          allowed_updates: ['message', 'callback_query']
+        });
         console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
       } catch (error) {
         console.error('[DEBUG] Error in start method:', error);
