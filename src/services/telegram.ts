@@ -1163,9 +1163,14 @@ export class TelegramService {
         
         // Then set the webhook
         await this.bot.telegram.setWebhook(webhookUrl, {
-          allowed_updates: ['message', 'callback_query']
+          allowed_updates: ['message', 'callback_query'],
+          drop_pending_updates: true
         });
         console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
+        
+        // Setup commands after webhook is set
+        await this.setupMenu();
+        console.log('[DEBUG] Menu setup completed');
       } catch (error) {
         console.error('[DEBUG] Error in start method:', error);
         throw error;
@@ -1586,5 +1591,9 @@ export class TelegramService {
       console.error('[DEBUG] Error handling update:', error);
       throw error;
     }
+  }
+
+  public getWebhookCallback() {
+    return this.bot.webhookCallback('/webhook');
   }
 } 
