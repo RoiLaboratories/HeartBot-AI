@@ -59,31 +59,51 @@ export class TelegramService {
         throw new Error('Invalid bot token format');
       }
       this.bot = new Telegraf<CustomContext>(token);
-      // Test the token immediately
-      this.bot.telegram.getMe().then(botInfo => {
-        console.log('[DEBUG] Bot initialized successfully:', botInfo.username);
-      }).catch(error => {
-        console.error('[DEBUG] Error validating bot token:', error);
-        throw error;
-      });
+      this.heartBot = heartBot;
+      
+      // Create a service role client for admin operations
+      if (!config.supabase.url || !config.supabase.serviceRoleKey) {
+        throw new Error('Missing required Supabase configuration');
+      }
+      this.adminClient = createClient(
+        config.supabase.url,
+        config.supabase.serviceRoleKey
+      );
+      this.filterStates = new Map();
+      this.customInputHandlers = new Map();
+      
+      // Setup basic commands first
+      this.setupBasicCommands();
+      
+      // Then setup the rest
+      this.setupCallbacks();
+      this.setupCustomInputMiddleware();
+      
+      console.log('[DEBUG] Bot initialized successfully');
     } catch (error) {
       console.error('[DEBUG] Error creating Telegraf instance:', error);
       throw error;
     }
-    this.heartBot = heartBot;
-    // Create a service role client for admin operations
-    if (!config.supabase.url || !config.supabase.serviceRoleKey) {
-      throw new Error('Missing required Supabase configuration');
-    }
-    this.adminClient = createClient(
-      config.supabase.url,
-      config.supabase.serviceRoleKey
-    );
-    this.filterStates = new Map();
-    this.customInputHandlers = new Map();
-    this.setupCommands();
-    this.setupCallbacks();
-    this.setupCustomInputMiddleware();
+  }
+
+  private setupBasicCommands() {
+    // Basic commands that should always work
+    this.bot.command('start', async (ctx) => {
+      console.log('[DEBUG] Start command received from user:', ctx.from?.id);
+      await ctx.reply('Bot is starting...');
+      await this.handleStart(ctx);
+    });
+
+    this.bot.command('help', async (ctx) => {
+      console.log('[DEBUG] Help command received from user:', ctx.from?.id);
+      await this.handleHelp(ctx);
+    });
+
+    // Add a test command
+    this.bot.command('ping', async (ctx) => {
+      console.log('[DEBUG] Ping command received from user:', ctx.from?.id);
+      await ctx.reply('Pong! Bot is working.');
+    });
   }
 
   private setupCommands() {
@@ -127,16 +147,6 @@ export class TelegramService {
       } catch (error) {
         console.error('[DEBUG] Error in deletefilter command:', error);
         await ctx.reply('❌ An error occurred while deleting your filter. Please try again.');
-      }
-    });
-    
-    this.bot.command('help', async (ctx) => {
-      try {
-        console.log('[DEBUG] Help command received from user:', ctx.from?.id);
-        await this.handleHelp(ctx);
-      } catch (error) {
-        console.error('[DEBUG] Error in help command:', error);
-        await ctx.reply('❌ An error occurred while fetching help. Please try again.');
       }
     });
     
@@ -1239,9 +1249,13 @@ export class TelegramService {
       const botInfo = await this.bot.telegram.getMe();
       console.log('[DEBUG] Bot token verified, bot info:', botInfo);
       
-      // Setup commands and menu
+      // Setup menu
       await this.setupMenu();
       console.log('[DEBUG] Menu setup completed');
+      
+      // Setup remaining commands
+      this.setupCommands();
+      console.log('[DEBUG] All commands setup completed');
       
       // Start the bot using long polling
       this.bot.launch({
