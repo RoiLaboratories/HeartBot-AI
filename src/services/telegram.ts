@@ -1110,7 +1110,7 @@ export class TelegramService {
   public start() {
     if (process.env.NODE_ENV === 'production') {
       // In production, use webhook
-      const webhookUrl = `${process.env.VERCEL_URL}/webhook`;
+      const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
       this.bot.telegram.setWebhook(webhookUrl).then(() => {
         console.log(`Webhook set to: ${webhookUrl}`);
       }).catch(error => {
