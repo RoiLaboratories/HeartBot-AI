@@ -1193,18 +1193,26 @@ export class TelegramService {
       await this.setupMenu();
       console.log('[DEBUG] Menu setup completed');
 
-      // Start long polling in both environments for testing
-      console.log('[DEBUG] Starting long polling mode');
-      this.isPolling = true;
-      await this.bot.launch({
-        allowedUpdates: ['message', 'callback_query'],
-        dropPendingUpdates: true
-      });
-      console.log('[DEBUG] Telegram bot started using long polling');
-      
-      // Enable graceful stop
-      process.once('SIGINT', () => this.stop());
-      process.once('SIGTERM', () => this.stop());
+      if (process.env.NODE_ENV === 'production') {
+        // In production, use webhooks
+        console.log('[DEBUG] Setting up webhook mode');
+        const webhookUrl = `${process.env.VERCEL_URL || 'https://your-vercel-url.vercel.app'}/webhook`;
+        await this.bot.telegram.setWebhook(webhookUrl);
+        console.log('[DEBUG] Webhook set to:', webhookUrl);
+      } else {
+        // In development, use long polling
+        console.log('[DEBUG] Starting long polling mode');
+        this.isPolling = true;
+        await this.bot.launch({
+          allowedUpdates: ['message', 'callback_query'],
+          dropPendingUpdates: true
+        });
+        console.log('[DEBUG] Telegram bot started using long polling');
+        
+        // Enable graceful stop
+        process.once('SIGINT', () => this.stop());
+        process.once('SIGTERM', () => this.stop());
+      }
     } catch (error) {
       this.isPolling = false;
       console.error('[DEBUG] Error in start method:', error);

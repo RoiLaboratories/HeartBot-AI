@@ -16,7 +16,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('[DEBUG] Bot started successfully');
     }
 
-    // Return status for all requests
+    // Handle Telegram webhook updates
+    if (req.method === 'POST') {
+      try {
+        const middleware = heartBot.telegram.getWebhookMiddleware();
+        await middleware(req, res);
+        return;
+      } catch (error) {
+        console.error('[DEBUG] Error handling webhook update:', error);
+        res.status(500).json({ 
+          status: 'error', 
+          message: 'Error handling update',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return;
+      }
+    }
+
+    // Return status for GET requests
     res.status(200).json({ 
       status: 'ok', 
       message: 'Bot is running',
