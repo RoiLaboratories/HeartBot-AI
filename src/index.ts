@@ -233,6 +233,10 @@ export default async function handler(req: any, res: any) {
       // Initialize bot if not already running
       if (!heartBot.isRunning) {
         console.log('[DEBUG] Starting bot...');
+        // Set webhook URL first
+        const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
+        console.log('[DEBUG] Setting webhook URL:', webhookUrl);
+        await heartBot.telegram.setWebhook(webhookUrl);
         await heartBot.start();
       }
       

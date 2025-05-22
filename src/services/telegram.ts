@@ -1114,17 +1114,19 @@ export class TelegramService {
     `.trim();
   }
 
-  public start() {
+  public async start() {
     console.log('[DEBUG] Starting Telegram bot...');
     if (process.env.NODE_ENV === 'production') {
       // In production, use webhook
       const webhookUrl = `https://${process.env.VERCEL_URL}/webhook`;
       console.log('[DEBUG] Setting webhook URL:', webhookUrl);
-      this.bot.telegram.setWebhook(webhookUrl).then(() => {
+      try {
+        await this.bot.telegram.setWebhook(webhookUrl);
         console.log(`[DEBUG] Webhook set to: ${webhookUrl}`);
-      }).catch(error => {
+      } catch (error) {
         console.error('[DEBUG] Error setting webhook:', error);
-      });
+        throw error;
+      }
     } else {
       // In development, use long polling
       this.setupMenu().then(() => {
@@ -1515,5 +1517,9 @@ export class TelegramService {
       console.error('Error stopping monitoring:', error);
       await ctx.reply('❌ Error stopping token monitoring. Please try again later.');
     }
+  }
+
+  public async setWebhook(url: string) {
+    await this.bot.telegram.setWebhook(url);
   }
 } 
