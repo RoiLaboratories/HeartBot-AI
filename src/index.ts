@@ -223,8 +223,14 @@ process.on('SIGINT', async () => {
 // Export for Vercel
 export default async function handler(req: any, res: any) {
   if (req.method === 'POST' && req.url === '/webhook') {
-    const middleware = heartBot.getWebhookMiddleware();
-    await middleware(req, res);
+    try {
+      const middleware = heartBot.getWebhookMiddleware();
+      await middleware(req, res);
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('Webhook error:', error);
+      res.status(200).send('OK'); // Always return 200 to Telegram
+    }
   } else {
     res.status(200).json({ status: 'ok', message: 'Server is running' });
   }
