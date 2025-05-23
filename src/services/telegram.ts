@@ -1390,7 +1390,7 @@ export class TelegramService {
               'Accept': 'application/json'
             },
             params: {
-              limit: 10
+              limit: config.moralis.tokenFetchLimit
             },
             timeout: 10000 // 10 second timeout
           });
