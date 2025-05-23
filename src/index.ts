@@ -278,13 +278,18 @@ export class HeartBot {
                 console.log(`[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
                 console.log('[DEBUG] Token data:', {
                   liquidity: token.liquidity,
-                  marketCap: token.marketCap
+                  marketCap: token.marketCap,
+                  holdersCount: token.holdersCount,
+                  devTokensPercentage: token.devTokensPercentage,
+                  contractAge: token.contractAge,
+                  tradingEnabled: token.tradingEnabled
                 });
                 console.log('[DEBUG] Filter criteria:', {
                   min_market_cap: filter.min_market_cap,
                   max_market_cap: filter.max_market_cap,
                   min_liquidity: filter.min_liquidity,
-                  max_liquidity: filter.max_liquidity
+                  max_liquidity: filter.max_liquidity,
+                  trading_enabled: filter.trading_enabled
                 });
 
                 const matches = this.matchesFilter(token, filter);
@@ -318,10 +323,21 @@ export class HeartBot {
   }
 
   private matchesFilter(token: TokenData, filter: any): boolean {
-    console.log(`\nChecking token ${token.address} against filter for user ${filter.user_id}`);
+    console.log(`\n[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
     console.log('Token data:', {
       liquidity: token.liquidity,
-      marketCap: token.marketCap
+      marketCap: token.marketCap,
+      holdersCount: token.holdersCount,
+      devTokensPercentage: token.devTokensPercentage,
+      contractAge: token.contractAge,
+      tradingEnabled: token.tradingEnabled
+    });
+    console.log('Filter criteria:', {
+      min_market_cap: filter.min_market_cap,
+      max_market_cap: filter.max_market_cap,
+      min_liquidity: filter.min_liquidity,
+      max_liquidity: filter.max_liquidity,
+      trading_enabled: filter.trading_enabled
     });
 
     // Market cap filters
@@ -342,6 +358,37 @@ export class HeartBot {
     if (filter.max_liquidity && token.liquidity > filter.max_liquidity) {
       console.log(`❌ Liquidity ${token.liquidity} > max ${filter.max_liquidity}`);
       return false;
+    }
+
+    // Holders filters
+    if (filter.min_holders && token.holdersCount < filter.min_holders) {
+      console.log(`❌ Holders ${token.holdersCount} < min ${filter.min_holders}`);
+      return false;
+    }
+    if (filter.max_holders && token.holdersCount > filter.max_holders) {
+      console.log(`❌ Holders ${token.holdersCount} > max ${filter.max_holders}`);
+      return false;
+    }
+
+    // Dev tokens filter
+    if (filter.max_dev_tokens && token.devTokensPercentage && token.devTokensPercentage > filter.max_dev_tokens) {
+      console.log(`❌ Dev tokens ${token.devTokensPercentage}% > max ${filter.max_dev_tokens}%`);
+      return false;
+    }
+
+    // Contract age filter
+    if (filter.min_contract_age && token.contractAge < filter.min_contract_age) {
+      console.log(`❌ Contract age ${token.contractAge} < min ${filter.min_contract_age}`);
+      return false;
+    }
+
+    // Trading status filter
+    if (filter.trading_enabled !== null && filter.trading_enabled !== undefined) {
+      console.log(`[DEBUG] Checking trading status - Token: ${token.tradingEnabled}, Filter: ${filter.trading_enabled}`);
+      if (token.tradingEnabled !== filter.trading_enabled) {
+        console.log(`❌ Trading status ${token.tradingEnabled} != required ${filter.trading_enabled}`);
+        return false;
+      }
     }
 
     // If we get here, the token matches all specified filters

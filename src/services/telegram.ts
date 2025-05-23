@@ -988,6 +988,8 @@ export class TelegramService {
         return;
       }
 
+      console.log('[DEBUG] Saving filter with state:', state);
+
       const { error } = await this.adminClient
         .from('Filter')
         .insert({
@@ -1004,12 +1006,15 @@ export class TelegramService {
           is_active: true
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[DEBUG] Error saving filter:', error);
+        throw error;
+      }
 
       this.filterStates.delete(telegramId);
       await ctx.editMessageText('✅ Filter saved successfully! You will receive alerts for tokens matching your criteria.');
     } catch (error) {
-      console.error('Error saving filter:', error);
+      console.error('[DEBUG] Error saving filter:', error);
       await ctx.editMessageText('❌ Error saving filter. Please try again later.');
     }
   }
