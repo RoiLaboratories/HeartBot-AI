@@ -1395,9 +1395,9 @@ export class TelegramService {
             timeout: 10000 // 10 second timeout
           });
 
-          console.log('Raw Moralis API Response:', response.data);
-          console.log('Response type:', typeof response.data);
-          console.log('Is Array?', Array.isArray(response.data));
+          console.log('[DEBUG] Moralis API Response Status:', response.status);
+          console.log('[DEBUG] Response type:', typeof response.data);
+          console.log('[DEBUG] Is Array?', Array.isArray(response.data));
 
           if (!response.data) {
             throw new Error('Empty response from Moralis API');
@@ -1425,10 +1425,22 @@ export class TelegramService {
             continue;
           }
           
+          if (error.response?.status === 500) {
+            console.error('[DEBUG] Moralis API server error:', error.response.data);
+            await ctx.reply('⚠️ Moralis API is currently experiencing issues. Please try again in a few minutes.');
+            return;
+          }
+          
           if (retryCount === maxRetries) {
             console.error('[DEBUG] Failed to fetch tokens after', maxRetries, 'attempts:', error);
-            await ctx.reply('⚠️ Unable to fetch new tokens from Moralis API. Testing with existing data...');
-            break;
+            if (error.response) {
+              await ctx.reply(`❌ Error fetching tokens: ${error.response.status} - ${error.response.statusText}\n\nPlease try again later.`);
+            } else if (error.code === 'ECONNABORTED') {
+              await ctx.reply('❌ Request timed out. Please try again later.');
+            } else {
+              await ctx.reply('❌ Error fetching tokens. Please try again later.');
+            }
+            return;
           }
           
           // For other errors, use exponential backoff
