@@ -336,10 +336,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('$500K', 'set_min_market_cap:500000'),
-            Markup.button.callback('$1M', 'set_min_market_cap:1000000'),
-            Markup.button.callback('Custom', 'set_min_market_cap:custom')
+            Markup.button.callback('$1M', 'set_min_market_cap:1000000')
           ],
-          [Markup.button.callback('Back', 'start_filter')]
+          [
+            Markup.button.callback('Skip', 'skip_market_cap'),
+            Markup.button.callback('Back', 'start_filter')
+          ]
         ])
       }
     );
@@ -408,10 +410,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('$5M', 'set_max_market_cap:5000000'),
-            Markup.button.callback('$10M', 'set_max_market_cap:10000000'),
-            Markup.button.callback('Custom', 'set_max_market_cap:custom')
+            Markup.button.callback('$10M', 'set_max_market_cap:10000000')
           ],
-          [Markup.button.callback('Back', 'filter_market_cap')]
+          [
+            Markup.button.callback('Skip', 'skip_market_cap'),
+            Markup.button.callback('Back', 'filter_market_cap')
+          ]
         ])
       }
     );
@@ -480,10 +484,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('$100K', 'set_min_liquidity:100000'),
-            Markup.button.callback('$500K', 'set_min_liquidity:500000'),
-            Markup.button.callback('Custom', 'set_min_liquidity:custom')
+            Markup.button.callback('$500K', 'set_min_liquidity:500000')
           ],
-          [Markup.button.callback('Back', 'filter_market_cap')]
+          [
+            Markup.button.callback('Skip', 'skip_liquidity'),
+            Markup.button.callback('Back', 'filter_market_cap')
+          ]
         ])
       }
     );
@@ -552,10 +558,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('$5M', 'set_max_liquidity:5000000'),
-            Markup.button.callback('$10M', 'set_max_liquidity:10000000'),
-            Markup.button.callback('Custom', 'set_max_liquidity:custom')
+            Markup.button.callback('$10M', 'set_max_liquidity:10000000')
           ],
-          [Markup.button.callback('Back', 'filter_liquidity')]
+          [
+            Markup.button.callback('Skip', 'skip_liquidity'),
+            Markup.button.callback('Back', 'filter_liquidity')
+          ]
         ])
       }
     );
@@ -624,10 +632,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('500', 'set_min_holders:500'),
-            Markup.button.callback('1000', 'set_min_holders:1000'),
-            Markup.button.callback('Custom', 'set_min_holders:custom')
+            Markup.button.callback('1000', 'set_min_holders:1000')
           ],
-          [Markup.button.callback('Back', 'filter_liquidity')]
+          [
+            Markup.button.callback('Skip', 'skip_holders'),
+            Markup.button.callback('Back', 'filter_liquidity')
+          ]
         ])
       }
     );
@@ -700,10 +710,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('5000', 'set_max_holders:5000'),
-            Markup.button.callback('10000', 'set_max_holders:10000'),
-            Markup.button.callback('Custom', 'set_max_holders:custom')
+            Markup.button.callback('10000', 'set_max_holders:10000')
           ],
-          [Markup.button.callback('Back', 'filter_holders')]
+          [
+            Markup.button.callback('Skip', 'skip_holders'),
+            Markup.button.callback('Back', 'filter_holders')
+          ]
         ])
       }
     );
@@ -772,10 +784,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('30%', 'set_max_dev_tokens:30'),
-            Markup.button.callback('50%', 'set_max_dev_tokens:50'),
-            Markup.button.callback('Custom', 'set_max_dev_tokens:custom')
+            Markup.button.callback('50%', 'set_max_dev_tokens:50')
           ],
-          [Markup.button.callback('Back', 'filter_holders')]
+          [
+            Markup.button.callback('Skip', 'skip_dev_tokens'),
+            Markup.button.callback('Back', 'filter_holders')
+          ]
         ])
       }
     );
@@ -844,10 +858,12 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('24h', 'set_min_age:24'),
-            Markup.button.callback('48h', 'set_min_age:48'),
-            Markup.button.callback('Custom', 'set_min_age:custom')
+            Markup.button.callback('48h', 'set_min_age:48')
           ],
-          [Markup.button.callback('Back', 'filter_dev_tokens')]
+          [
+            Markup.button.callback('Skip', 'skip_contract_age'),
+            Markup.button.callback('Back', 'filter_dev_tokens')
+          ]
         ])
       }
     );
