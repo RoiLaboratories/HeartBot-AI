@@ -1467,8 +1467,20 @@ export class TelegramService {
             devTokensPercentage: 0 // Not available from Moralis
           };
 
+          // Calculate marketCap if not provided
+          if (!finalTokenData.marketCap && finalTokenData.priceUsd && finalTokenData.liquidity) {
+            // Estimate marketCap as 2x liquidity for new tokens
+            finalTokenData.marketCap = finalTokenData.liquidity * 2;
+            console.log(`[DEBUG] Calculated marketCap for ${token.tokenAddress}: ${finalTokenData.marketCap}`);
+          }
+
           // Validate token data
-          if (!finalTokenData.liquidity || !finalTokenData.marketCap) {
+          if (!finalTokenData.liquidity) {
+            console.log(`Invalid token data for ${token.tokenAddress}:`, finalTokenData);
+            continue;
+          }
+
+          if (!finalTokenData.marketCap) {
             console.log(`Invalid token data for ${token.tokenAddress}:`, finalTokenData);
             continue;
           }
