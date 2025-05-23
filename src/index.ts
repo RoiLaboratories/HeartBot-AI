@@ -198,6 +198,7 @@ export class HeartBot {
           }
 
           filters = data;
+          console.log(`[DEBUG] Found ${filters.length} active filters`);
         } catch (error) {
           console.error('[DEBUG] Error fetching filters:', error);
           return;
@@ -237,11 +238,25 @@ export class HeartBot {
                   continue;
                 }
 
+                console.log(`[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
+                console.log('[DEBUG] Token data:', {
+                  liquidity: token.liquidity,
+                  marketCap: token.marketCap
+                });
+                console.log('[DEBUG] Filter criteria:', {
+                  min_market_cap: filter.min_market_cap,
+                  max_market_cap: filter.max_market_cap,
+                  min_liquidity: filter.min_liquidity,
+                  max_liquidity: filter.max_liquidity
+                });
+
                 const matches = this.matchesFilter(token, filter);
                 if (matches) {
                   console.log(`[DEBUG] Token ${token.address} matches filter for user ${filter.user_id}`);
                   await this.telegram.sendTokenAlert(filter.user_id, token);
                   console.log(`[DEBUG] Alert sent to user ${filter.user_id} for token ${token.address}`);
+                } else {
+                  console.log(`[DEBUG] Token ${token.address} does not match filter for user ${filter.user_id}`);
                 }
               } catch (error) {
                 console.error(`[DEBUG] Error processing filter for user ${filter.user_id}:`, error);

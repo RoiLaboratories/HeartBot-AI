@@ -323,43 +323,26 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    try {
-      const message = '💰 <b>Set Market Cap Range</b>\n\n' +
-        'Choose the minimum market cap:';
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback('$3K', 'set_min_market_cap:3000'),
-          Markup.button.callback('$5K', 'set_min_market_cap:5000'),
-          Markup.button.callback('$10K', 'set_min_market_cap:10000')
-        ],
-        [
-          Markup.button.callback('$20K', 'set_min_market_cap:20000'),
-          Markup.button.callback('$50K', 'set_min_market_cap:50000'),
-          Markup.button.callback('$100K', 'set_min_market_cap:100000')
-        ],
-        [Markup.button.callback('Skip', 'skip_market_cap')]
-      ]);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        }).catch(async (error) => {
-          if (error.message.includes('message is not modified')) {
-            return;
-          }
-          throw error;
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        });
+    await ctx.editMessageText(
+      '💰 <b>Set Market Cap Range</b>\n\n' +
+      'Choose minimum market cap:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('$10K', 'set_min_market_cap:10000'),
+            Markup.button.callback('$50K', 'set_min_market_cap:50000'),
+            Markup.button.callback('$100K', 'set_min_market_cap:100000')
+          ],
+          [
+            Markup.button.callback('$500K', 'set_min_market_cap:500000'),
+            Markup.button.callback('$1M', 'set_min_market_cap:1000000'),
+            Markup.button.callback('Custom', 'set_min_market_cap:custom')
+          ],
+          [Markup.button.callback('Back', 'start_filter')]
+        ])
       }
-    } catch (error) {
-      console.error('Error in handleMarketCapStep:', error);
-      await ctx.reply('❌ An error occurred. Please try again.');
-    }
+    );
   }
 
   private async handleMinMarketCap(ctx: CustomContext) {
@@ -412,31 +395,23 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    const state = this.filterStates.get(telegramId);
-    const minMarketCap = state?.minMarketCap || 0;
-
     await ctx.editMessageText(
       '💰 <b>Set Maximum Market Cap</b>\n\n' +
-      `Minimum: $${minMarketCap.toLocaleString()}\n` +
-      'Choose the maximum market cap:',
+      'Choose maximum market cap:',
       {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback('$5K', 'set_max_market_cap:5000'),
-            Markup.button.callback('$10K', 'set_max_market_cap:10000'),
-            Markup.button.callback('$20K', 'set_max_market_cap:20000')
-          ],
-          [
-            Markup.button.callback('$50K', 'set_max_market_cap:50000'),
             Markup.button.callback('$100K', 'set_max_market_cap:100000'),
-            Markup.button.callback('$500K', 'set_max_market_cap:500000')
+            Markup.button.callback('$500K', 'set_max_market_cap:500000'),
+            Markup.button.callback('$1M', 'set_max_market_cap:1000000')
           ],
           [
-            Markup.button.callback('$1M', 'set_max_market_cap:1000000'),
-            // Markup.button.callback('Custom', 'set_max_market_cap:custom')
+            Markup.button.callback('$5M', 'set_max_market_cap:5000000'),
+            Markup.button.callback('$10M', 'set_max_market_cap:10000000'),
+            Markup.button.callback('Custom', 'set_max_market_cap:custom')
           ],
-          [Markup.button.callback('Skip', 'skip_market_cap')]
+          [Markup.button.callback('Back', 'filter_market_cap')]
         ])
       }
     );
@@ -492,43 +467,26 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    try {
-      const message = '💧 <b>Set Liquidity Range</b>\n\n' +
-        'Choose the minimum liquidity:';
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback('$5K', 'set_min_liquidity:5000'),
-          Markup.button.callback('$10K', 'set_min_liquidity:10000'),
-          Markup.button.callback('$20K', 'set_min_liquidity:20000')
-        ],
-        [
-          Markup.button.callback('$50K', 'set_min_liquidity:50000'),
-          Markup.button.callback('$100K', 'set_min_liquidity:100000'),
-          // Markup.button.callback('Custom', 'set_min_liquidity:custom')
-        ],
-        [Markup.button.callback('Skip', 'skip_liquidity')]
-      ]);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        }).catch(async (error) => {
-          if (error.message.includes('message is not modified')) {
-            return;
-          }
-          throw error;
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        });
+    await ctx.editMessageText(
+      '💧 <b>Set Liquidity Range</b>\n\n' +
+      'Choose minimum liquidity:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('$5K', 'set_min_liquidity:5000'),
+            Markup.button.callback('$10K', 'set_min_liquidity:10000'),
+            Markup.button.callback('$50K', 'set_min_liquidity:50000')
+          ],
+          [
+            Markup.button.callback('$100K', 'set_min_liquidity:100000'),
+            Markup.button.callback('$500K', 'set_min_liquidity:500000'),
+            Markup.button.callback('Custom', 'set_min_liquidity:custom')
+          ],
+          [Markup.button.callback('Back', 'filter_market_cap')]
+        ])
       }
-    } catch (error) {
-      console.error('Error in handleLiquidityStep:', error);
-      await ctx.reply('❌ An error occurred. Please try again.');
-    }
+    );
   }
 
   private async handleMinLiquidity(ctx: CustomContext) {
@@ -581,27 +539,23 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    const state = this.filterStates.get(telegramId);
-    const minLiquidity = state?.minLiquidity || 0;
-
     await ctx.editMessageText(
       '💧 <b>Set Maximum Liquidity</b>\n\n' +
-      `Minimum: $${minLiquidity.toLocaleString()}\n` +
-      'Choose the maximum liquidity:',
+      'Choose maximum liquidity:',
       {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback('$20K', 'set_max_liquidity:20000'),
-            Markup.button.callback('$50K', 'set_max_liquidity:50000'),
-            Markup.button.callback('$100K', 'set_max_liquidity:100000')
+            Markup.button.callback('$100K', 'set_max_liquidity:100000'),
+            Markup.button.callback('$500K', 'set_max_liquidity:500000'),
+            Markup.button.callback('$1M', 'set_max_liquidity:1000000')
           ],
           [
-            Markup.button.callback('$500K', 'set_max_liquidity:500000'),
-            Markup.button.callback('$1M', 'set_max_liquidity:1000000'),
-            // Markup.button.callback('Custom', 'set_max_liquidity:custom')
+            Markup.button.callback('$5M', 'set_max_liquidity:5000000'),
+            Markup.button.callback('$10M', 'set_max_liquidity:10000000'),
+            Markup.button.callback('Custom', 'set_max_liquidity:custom')
           ],
-          [Markup.button.callback('Skip', 'skip_liquidity')]
+          [Markup.button.callback('Back', 'filter_liquidity')]
         ])
       }
     );
@@ -657,43 +611,26 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    try {
-      const message = '👥 <b>Set Holders Range</b>\n\n' +
-        'Choose the minimum number of holders:';
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback('10', 'set_min_holders:10'),
-          Markup.button.callback('50', 'set_min_holders:50'),
-          Markup.button.callback('100', 'set_min_holders:100')
-        ],
-        [
-          Markup.button.callback('500', 'set_min_holders:500'),
-          Markup.button.callback('1000', 'set_min_holders:1000'),
-          // Markup.button.callback('Custom', 'set_min_holders:custom')
-        ],
-        [Markup.button.callback('Skip', 'skip_holders')]
-      ]);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        }).catch(async (error) => {
-          if (error.message.includes('message is not modified')) {
-            return;
-          }
-          throw error;
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        });
+    await ctx.editMessageText(
+      '👥 <b>Set Holders Range</b>\n\n' +
+      'Choose minimum number of holders:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('10', 'set_min_holders:10'),
+            Markup.button.callback('50', 'set_min_holders:50'),
+            Markup.button.callback('100', 'set_min_holders:100')
+          ],
+          [
+            Markup.button.callback('500', 'set_min_holders:500'),
+            Markup.button.callback('1000', 'set_min_holders:1000'),
+            Markup.button.callback('Custom', 'set_min_holders:custom')
+          ],
+          [Markup.button.callback('Back', 'filter_liquidity')]
+        ])
       }
-    } catch (error) {
-      console.error('Error in handleHoldersStep:', error);
-      await ctx.reply('❌ An error occurred. Please try again.');
-    }
+    );
   }
 
   private async handleMinHolders(ctx: CustomContext) {
@@ -764,9 +701,9 @@ export class TelegramService {
           [
             Markup.button.callback('5000', 'set_max_holders:5000'),
             Markup.button.callback('10000', 'set_max_holders:10000'),
-            // Markup.button.callback('Custom', 'set_max_holders:custom')
+            Markup.button.callback('Custom', 'set_max_holders:custom')
           ],
-          [Markup.button.callback('Skip', 'skip_holders')]
+          [Markup.button.callback('Back', 'filter_holders')]
         ])
       }
     );
@@ -822,43 +759,26 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    try {
-      const message = '🔒 <b>Set Maximum Dev Tokens</b>\n\n' +
-        'Choose the maximum percentage of tokens held by developers:';
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback('1%', 'set_max_dev_tokens:1'),
-          Markup.button.callback('2%', 'set_max_dev_tokens:2'),
-          Markup.button.callback('5%', 'set_max_dev_tokens:5')
-        ],
-        [
-          Markup.button.callback('10%', 'set_max_dev_tokens:10'),
-          Markup.button.callback('20%', 'set_max_dev_tokens:20'),
-          // Markup.button.callback('Custom', 'set_max_dev_tokens:custom')
-        ],
-        [Markup.button.callback('Skip', 'skip_dev_tokens')]
-      ]);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        }).catch(async (error) => {
-          if (error.message.includes('message is not modified')) {
-            return;
-          }
-          throw error;
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        });
+    await ctx.editMessageText(
+      '🔒 <b>Set Maximum Dev Tokens</b>\n\n' +
+      'Choose maximum percentage of tokens held by developers:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('5%', 'set_max_dev_tokens:5'),
+            Markup.button.callback('10%', 'set_max_dev_tokens:10'),
+            Markup.button.callback('20%', 'set_max_dev_tokens:20')
+          ],
+          [
+            Markup.button.callback('30%', 'set_max_dev_tokens:30'),
+            Markup.button.callback('50%', 'set_max_dev_tokens:50'),
+            Markup.button.callback('Custom', 'set_max_dev_tokens:custom')
+          ],
+          [Markup.button.callback('Back', 'filter_holders')]
+        ])
       }
-    } catch (error) {
-      console.error('Error in handleDevTokensStep:', error);
-      await ctx.reply('❌ An error occurred. Please try again.');
-    }
+    );
   }
 
   private async handleMaxDevTokens(ctx: CustomContext) {
@@ -911,43 +831,26 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    try {
-      const message = '⏰ <b>Set Minimum Contract Age</b>\n\n' +
-        'Choose the minimum age of the contract:';
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback('1 hour', 'set_min_age:1'),
-          Markup.button.callback('2 hours', 'set_min_age:2'),
-          Markup.button.callback('4 hours', 'set_min_age:4')
-        ],
-        [
-          Markup.button.callback('8 hours', 'set_min_age:8'),
-          Markup.button.callback('12 hours', 'set_min_age:12'),
-          Markup.button.callback('24 hours', 'set_min_age:24')
-        ],
-        [Markup.button.callback('Skip', 'skip_contract_age')]
-      ]);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        }).catch(async (error) => {
-          if (error.message.includes('message is not modified')) {
-            return;
-          }
-          throw error;
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        });
+    await ctx.editMessageText(
+      '⏰ <b>Set Minimum Contract Age</b>\n\n' +
+      'Choose minimum age of the contract in hours:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('1h', 'set_min_age:1'),
+            Markup.button.callback('6h', 'set_min_age:6'),
+            Markup.button.callback('12h', 'set_min_age:12')
+          ],
+          [
+            Markup.button.callback('24h', 'set_min_age:24'),
+            Markup.button.callback('48h', 'set_min_age:48'),
+            Markup.button.callback('Custom', 'set_min_age:custom')
+          ],
+          [Markup.button.callback('Back', 'filter_dev_tokens')]
+        ])
       }
-    } catch (error) {
-      console.error('Error in handleContractAgeStep:', error);
-      await ctx.reply('❌ An error occurred. Please try again.');
-    }
+    );
   }
 
   private async handleMinContractAge(ctx: CustomContext) {
@@ -971,37 +874,20 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    try {
-      const message = '🔄 <b>Set Trading Status</b>\n\n' +
-        'Choose the trading status requirement:';
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback('Trading', 'set_trading_status:trading'),
-          Markup.button.callback('Not Trading', 'set_trading_status:not_trading')
-        ],
-        [Markup.button.callback('Any Status', 'skip_trading_status')]
-      ]);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        }).catch(async (error) => {
-          if (error.message.includes('message is not modified')) {
-            return;
-          }
-          throw error;
-        });
-      } else {
-        await ctx.reply(message, {
-          parse_mode: 'HTML',
-          ...keyboard
-        });
+    await ctx.editMessageText(
+      '🔄 <b>Set Trading Status</b>\n\n' +
+      'Choose trading status:',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('Trading', 'set_trading_status:true'),
+            Markup.button.callback('Not Trading', 'set_trading_status:false')
+          ],
+          [Markup.button.callback('Back', 'filter_contract_age')]
+        ])
       }
-    } catch (error) {
-      console.error('Error in handleTradingStatusStep:', error);
-      await ctx.reply('❌ An error occurred. Please try again.');
-    }
+    );
   }
 
   private async handleTradingStatus(ctx: CustomContext) {
@@ -1015,7 +901,7 @@ export class TelegramService {
 
     const state = this.filterStates.get(telegramId);
     if (state) {
-      state.tradingStatus = value === 'trading';
+      state.tradingStatus = value === 'true';
       this.filterStates.set(telegramId, state);
       await this.handleFilterReview(ctx);
     }
@@ -1678,7 +1564,7 @@ export class TelegramService {
     try {
       // Enable monitoring for this user
       this.heartBot.enableMonitoring(userId);
-      await ctx.reply('✅ Token monitoring started! You will receive alerts for new tokens that match your filters every 30 seconds.');
+      await ctx.reply('✅ Token monitoring started! You will receive alerts for new tokens that match your filters every 60 seconds.');
     } catch (error) {
       console.error('Error starting monitoring:', error);
       await ctx.reply('❌ Error starting token monitoring. Please try again later.');
