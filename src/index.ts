@@ -120,7 +120,7 @@ export class HeartBot {
 
     // Start the monitoring loop in the background
     const intervalId = setInterval(async () => {
-      console.log('[DEBUG] Monitoring cycle started');
+      console.log('\n[DEBUG] ===== New Monitoring Cycle Started =====');
       console.log('[DEBUG] Bot running status:', this.isRunning);
       
       if (!this.isRunning) {
@@ -153,6 +153,14 @@ export class HeartBot {
             console.log('[DEBUG] Attempting to fetch new tokens...');
             newTokens = await this.pumpFun.getNewTokens();
             console.log(`[DEBUG] Successfully fetched ${newTokens.length} new tokens`);
+            if (newTokens.length > 0) {
+              console.log('[DEBUG] First token sample:', {
+                address: newTokens[0].address,
+                name: newTokens[0].name,
+                marketCap: newTokens[0].marketCap,
+                liquidity: newTokens[0].liquidity
+              });
+            }
             break; // Success, exit retry loop
           } catch (error: any) {
             retryCount++;
@@ -199,6 +207,18 @@ export class HeartBot {
 
           filters = data;
           console.log(`[DEBUG] Found ${filters.length} active filters`);
+          
+          // Log filter details for debugging
+          filters.forEach((filter: any, index: number) => {
+            console.log(`[DEBUG] Filter ${index + 1}:`, {
+              user_id: filter.user_id,
+              min_market_cap: filter.min_market_cap,
+              max_market_cap: filter.max_market_cap,
+              min_liquidity: filter.min_liquidity,
+              max_liquidity: filter.max_liquidity,
+              is_active: filter.is_active
+            });
+          });
         } catch (error) {
           console.error('[DEBUG] Error fetching filters:', error);
           return;
@@ -209,12 +229,15 @@ export class HeartBot {
           return;
         }
 
-        console.log(`[DEBUG] Found ${filters.length} active filters to check`);
-
         // Process each token
         for (const token of newTokens) {
           try {
-            console.log(`[DEBUG] Processing token: ${token.address}`);
+            console.log(`\n[DEBUG] Processing token: ${token.address}`);
+            console.log('[DEBUG] Token details:', {
+              name: token.name,
+              marketCap: token.marketCap,
+              liquidity: token.liquidity
+            });
 
             // Validate token data
             if (!token.liquidity || !token.marketCap) {
@@ -272,7 +295,8 @@ export class HeartBot {
         console.error('[DEBUG] Error in monitoring cycle:', error);
         // Don't throw the error, just log it and continue
       }
-    }, 60000); // Check every 60 seconds instead of 30 to avoid rate limits
+      console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
+    }, 60000); // Check every 60 seconds
 
     // Store interval ID for cleanup
     this.monitoringIntervalId = intervalId;
