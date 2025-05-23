@@ -158,7 +158,8 @@ export class HeartBot {
                 address: newTokens[0].address,
                 name: newTokens[0].name,
                 marketCap: newTokens[0].marketCap,
-                liquidity: newTokens[0].liquidity
+                liquidity: newTokens[0].liquidity,
+                priceUsd: newTokens[0].priceUsd
               });
             }
             break; // Success, exit retry loop
@@ -236,12 +237,25 @@ export class HeartBot {
             console.log('[DEBUG] Token details:', {
               name: token.name,
               marketCap: token.marketCap,
-              liquidity: token.liquidity
+              liquidity: token.liquidity,
+              priceUsd: token.priceUsd
             });
 
+            // Calculate marketCap if not provided
+            if (!token.marketCap && token.priceUsd && token.liquidity) {
+              // Estimate marketCap as 2x liquidity for new tokens
+              token.marketCap = token.liquidity * 2;
+              console.log(`[DEBUG] Calculated marketCap for ${token.address}: ${token.marketCap}`);
+            }
+
             // Validate token data
-            if (!token.liquidity || !token.marketCap) {
-              console.log(`[DEBUG] Skipping invalid token data for ${token.address}`);
+            if (!token.liquidity) {
+              console.log(`[DEBUG] Skipping token ${token.address} - missing liquidity data`);
+              continue;
+            }
+
+            if (!token.marketCap) {
+              console.log(`[DEBUG] Skipping token ${token.address} - missing marketCap data and unable to calculate`);
               continue;
             }
 
