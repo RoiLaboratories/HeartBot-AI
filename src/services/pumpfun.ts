@@ -14,7 +14,7 @@ export class PumpFunService {
     this.lastCheckedTimestamp = 0;
   }
 
-  async getNewTokens(): Promise<TokenData[]> {
+  async getNewTokens(_userId: string): Promise<TokenData[]> {
     try {
       console.log('[DEBUG] Fetching new tokens from Moralis...');
       const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
