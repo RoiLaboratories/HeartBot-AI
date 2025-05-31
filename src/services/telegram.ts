@@ -135,28 +135,35 @@ export class TelegramService {
     this.bot.action(/^set_max_market_cap:(\d+)$/, async (ctx) => await this.handleMaxMarketCap(ctx));
     this.bot.action('skip_market_cap', async (ctx) => await this.handleLiquidityStep(ctx));
     this.bot.action('custom_market_cap', this.handleMinMarketCap.bind(this));
+    this.bot.action('custom_max_market_cap', this.handleMaxMarketCap.bind(this));
+
 
     // Liquidity callbacks
     this.bot.action('filter_liquidity', async (ctx) => await this.handleLiquidityStep(ctx));
     this.bot.action(/^set_min_liquidity:(\d+)$/, async (ctx) => await this.handleMinLiquidity(ctx));
     this.bot.action(/^set_max_liquidity:(\d+)$/, async (ctx) => await this.handleMaxLiquidity(ctx));
     this.bot.action('skip_liquidity', async (ctx) => await this.handleHoldersStep(ctx));
-
+    this.bot.action('custom_liquidity', this.handleMinLiquidity.bind(this));
+    this.bot.action('custom_max_liquidity', this.handleMaxLiquidity.bind(this));
     // Holders callbacks
     this.bot.action('filter_holders', async (ctx) => await this.handleHoldersStep(ctx));
     this.bot.action(/^set_min_holders:(\d+)$/, async (ctx) => await this.handleMinHolders(ctx));
     this.bot.action(/^set_max_holders:(\d+)$/, async (ctx) => await this.handleMaxHolders(ctx));
     this.bot.action('skip_holders', async (ctx) => await this.handleDevTokensStep(ctx));
+    this.bot.action('custom_holders', this.handleMinHolders.bind(this));
+    this.bot.action('custom_max_holders', this.handleMaxHolders.bind(this));
 
     // Dev tokens callbacks
     this.bot.action('filter_dev_tokens', async (ctx) => await this.handleDevTokensStep(ctx));
     this.bot.action(/^set_max_dev_tokens:(\d+)$/, async (ctx) => await this.handleMaxDevTokens(ctx));
     this.bot.action('skip_dev_tokens', async (ctx) => await this.handleContractAgeStep(ctx));
+    this.bot.action('custom_dev_tokens', this.handleMaxDevTokens.bind(this));
 
     // Contract age callbacks
     this.bot.action('filter_contract_age', async (ctx) => await this.handleContractAgeStep(ctx));
     this.bot.action(/^set_min_age:(\d+)$/, async (ctx) => await this.handleMinContractAge(ctx));
     this.bot.action('skip_contract_age', async (ctx) => await this.handleTradingStatusStep(ctx));
+    // this.bot.action('custom_contract_age', this.handleMinContractAge.bind(this));
 
     // Trading status callbacks
     this.bot.action('filter_trading_status', async (ctx) => await this.handleTradingStatusStep(ctx));
@@ -447,6 +454,7 @@ export class TelegramService {
   }
 
   private async handleMaxMarketCapStep(ctx: CustomContext) {
+    
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -467,6 +475,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_market_cap'),
+            Markup.button.callback('Custom', 'custom_max_market_cap'), 
             Markup.button.callback('Back', 'filter_market_cap')
           ]
         ])
@@ -475,6 +484,14 @@ export class TelegramService {
   }
 
   private async handleMaxMarketCap(ctx: CustomContext) {
+    const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -483,8 +500,8 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
-      await ctx.editMessageText(
+    if (callbackData === 'custom_max_market_cap') {
+     await this.safeEditOrReply(ctx,
         '💰 <b>Enter Maximum Market Cap</b>\n\n' +
         'Please enter the maximum market cap in USD:',
         {
@@ -541,6 +558,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_liquidity'),
+            Markup.button.callback('Custom', 'custom_liquidity'),
             Markup.button.callback('Back', 'filter_market_cap')
           ]
         ])
@@ -549,6 +567,14 @@ export class TelegramService {
   }
 
   private async handleMinLiquidity(ctx: CustomContext) {
+    const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -557,7 +583,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
+    if (callbackData === 'custom_liquidity') {
       await this.safeEditOrReply(ctx,
         '💧 <b>Enter Minimum Liquidity</b>\n\n' +
         'Please enter the minimum liquidity in USD:',
@@ -615,6 +641,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_liquidity'),
+            Markup.button.callback('Custom', 'custom_max_liquidity'),
             Markup.button.callback('Back', 'filter_liquidity')
           ]
         ])
@@ -623,6 +650,14 @@ export class TelegramService {
   }
 
   private async handleMaxLiquidity(ctx: CustomContext) {
+    const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -631,7 +666,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
+    if (callbackData === 'custom_max_liquidity') {
       await this.safeEditOrReply(ctx,
         '💧 <b>Enter Maximum Liquidity</b>\n\n' +
         'Please enter the maximum liquidity in USD:',
@@ -689,6 +724,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_holders'),
+            Markup.button.callback('Custom', 'custom_holders'),
             Markup.button.callback('Back', 'filter_liquidity')
           ]
         ])
@@ -697,6 +733,14 @@ export class TelegramService {
   }
 
   private async handleMinHolders(ctx: CustomContext) {
+    const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -705,7 +749,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
+    if (callbackData === 'custom_holders') {
        await this.safeEditOrReply(ctx,
         '👥 <b>Enter Minimum Holders</b>\n\n' +
         'Please enter the minimum number of holders:',
@@ -767,6 +811,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_holders'),
+            Markup.button.callback('Custom', 'custom_max_holders'),
             Markup.button.callback('Back', 'filter_holders')
           ]
         ])
@@ -775,6 +820,14 @@ export class TelegramService {
   }
 
   private async handleMaxHolders(ctx: CustomContext) {
+     const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -783,7 +836,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
+    if (callbackData === 'custom_max_holders') {
       await this.safeEditOrReply(ctx,
         '👥 <b>Enter Maximum Holders</b>\n\n' +
         'Please enter the maximum number of holders:',
@@ -841,6 +894,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_dev_tokens'),
+            Markup.button.callback('Custom', 'custom_dev_tokens'),
             Markup.button.callback('Back', 'filter_holders')
           ]
         ])
@@ -849,6 +903,14 @@ export class TelegramService {
   }
 
   private async handleMaxDevTokens(ctx: CustomContext) {
+    const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -857,7 +919,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
+    if (callbackData === 'custom_dev_tokens') {
        await this.safeEditOrReply(ctx,
         '🔒 <b>Enter Maximum Dev Tokens</b>\n\n' +
         'Please enter the maximum percentage of tokens held by developers:',
@@ -915,6 +977,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_contract_age'),
+            //Markup.button.callback('Custom', 'custom_contract_age'),
             Markup.button.callback('Back', 'filter_dev_tokens')
           ]
         ])
@@ -923,6 +986,15 @@ export class TelegramService {
   }
 
   private async handleMinContractAge(ctx: CustomContext) {
+    {/*
+    const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+    */}
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
