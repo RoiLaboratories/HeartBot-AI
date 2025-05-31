@@ -17,6 +17,37 @@ export class HeartBot {
   private initializationPromise: Promise<void> | null = null;
   public monitoringIntervalId: NodeJS.Timeout | undefined;
 
+  public startMonitoringLoop() {
+  if (this.monitoringIntervalId) return; // already running
+
+  console.log('[HeartBot] Starting monitoring loop...');
+  this.isRunning = true;
+
+  this.monitoringIntervalId = setInterval(async () => {
+    for (const [userId, enabled] of this.monitoringEnabled.entries()) {
+      if (!enabled) continue;
+
+      console.log(`[HeartBot] Scanning for new tokens for user ${userId}`);
+      try {
+        const tokens = await this.pumpFun.getNewTokens(userId); // implement this method in PumpFunService
+
+        if (tokens.length === 0) {
+          console.log(`[HeartBot] No tokens matched for user ${userId}`);
+          continue;
+        }
+
+        for (const token of tokens) {
+          await this.telegram.sendTokenAlert(userId, token);
+        }
+
+      } catch (error) {
+        console.error(`[HeartBot] Error during scan for user ${userId}:`, error);
+      }
+    }
+  }, 60 * 1000); // every 60 seconds
+}
+
+
   // public getMonitoringIntervalId(): NodeJS.Timeout | undefined {
   //   return this.monitoringIntervalId;
   // }
@@ -159,7 +190,7 @@ export class HeartBot {
         while (retryCount < maxRetries) {
           try {
             console.log('[DEBUG] Attempting to fetch new tokens...');
-            newTokens = await this.pumpFun.getNewTokens();
+            newTokens = await this.pumpFun.getNewTokens(activeUsers[0]); // Use first active user's ID
             console.log(`[DEBUG] Successfully fetched ${newTokens.length} new tokens`);
             if (newTokens.length > 0) {
               console.log('[DEBUG] First token sample:', {
@@ -323,9 +354,7 @@ export class HeartBot {
         // Don't throw the error, just log it and continue
       }
       console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
-    }, 60000); // Check every 60 seconds
-
-    // Store interval ID for cleanup
+    }, 60000); // Check every 60 seconds    // Store interval ID for cleanup
     this.monitoringIntervalId = intervalId;
     console.log('[DEBUG] Token monitoring system started successfully');
   }
