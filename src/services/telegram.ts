@@ -133,7 +133,7 @@ export class TelegramService {
     this.bot.action(/^set_min_market_cap:(\d+)$/, async (ctx) => await this.handleMinMarketCap(ctx));
     this.bot.action(/^set_max_market_cap:(\d+)$/, async (ctx) => await this.handleMaxMarketCap(ctx));
     this.bot.action('skip_market_cap', async (ctx) => await this.handleLiquidityStep(ctx));
-    this.bot.action('custom_min_market_cap', async (ctx) => await this.handleMinMarketCap(ctx));
+    this.bot.action('custom_market_cap', async (ctx) => await this.handleMinMarketCap(ctx));
     // Liquidity callbacks
     this.bot.action('filter_liquidity', async (ctx) => await this.handleLiquidityStep(ctx));
     this.bot.action(/^set_min_liquidity:(\d+)$/, async (ctx) => await this.handleMinLiquidity(ctx));
@@ -356,7 +356,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom') {
+    if (value === 'custom_market_cap') {
       await ctx.answerCbQuery(); 
       await ctx.editMessageText(
         '💰 <b>Enter Minimum Market Cap</b>\n\n' +
