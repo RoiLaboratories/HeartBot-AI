@@ -47,7 +47,7 @@ export class TelegramService {
   private filterStates: Map<string, FilterState> = new Map();
   private customInputHandlers: Map<string, (ctx: CustomContext) => Promise<void>> = new Map();
   private heartBot: HeartBot = null!;
-  telegram: any;
+  
 
   private async handleDebugStatus(ctx: Context) {
     const userId = ctx.from?.id.toString();
@@ -1774,7 +1774,7 @@ export class TelegramService {
       devTokensPercentage: 5,
     };
 
-    await this.telegram.sendTokenAlert(userId, testToken);
+    await this.sendTokenAlert(userId, testToken);
   } catch (error) {
     console.error('[handleFetch] Error starting monitoring:', error);
     await ctx.reply('❌ Error starting token monitoring. Please try again later.');
