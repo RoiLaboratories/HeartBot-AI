@@ -340,6 +340,7 @@ export class TelegramService {
           ],
           [
             Markup.button.callback('Skip', 'skip_market_cap'),
+            Markup.button.callback('Custom', 'custom_market_cap'),
             Markup.button.callback('Back', 'start_filter')
           ]
         ])
