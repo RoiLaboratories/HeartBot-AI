@@ -1,4 +1,5 @@
 import { Telegraf, Context, Markup } from 'telegraf';
+import { CallbackQuery } from 'telegraf/typings/core/types/typegram';
 import { config } from '../config';
 import { TokenData } from '../types';
 import { createClient } from '@supabase/supabase-js';
@@ -349,6 +350,14 @@ export class TelegramService {
   }
 
   private async handleMinMarketCap(ctx: CustomContext) {
+      const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
+
+    if (!cb || typeof cb.data !== 'string') {
+    return ctx.reply('❌ Invalid callback query.');
+  }
+
+  const callbackData = cb.data;
+  
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
@@ -357,7 +366,7 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'custom_market_cap') {
+    if (callbackData === 'custom_market_cap') {
       await ctx.answerCbQuery(); 
       await ctx.editMessageText(
         '💰 <b>Enter Minimum Market Cap</b>\n\n' +
