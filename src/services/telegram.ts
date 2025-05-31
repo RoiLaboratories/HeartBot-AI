@@ -48,6 +48,21 @@ export class TelegramService {
   private customInputHandlers: Map<string, (ctx: CustomContext) => Promise<void>> = new Map();
   private heartBot: HeartBot = null!;
 
+  private async handleDebugStatus(ctx: Context) {
+    const userId = ctx.from?.id.toString();
+    if (!userId) return;
+    
+    const isMonitoring = this.heartBot.isMonitoringEnabled(userId);
+    const isRunning = this.heartBot.isRunning;
+    const intervalExists = !!this.heartBot.monitoringIntervalId; // Direct property access
+    
+    await ctx.reply(`🔍 Debug Status:
+🤖 Bot running: ${isRunning}
+⏰ Interval exists: ${intervalExists} 
+👤 Your monitoring: ${isMonitoring}
+📊 Total monitoring users: ${this.heartBot.getActiveMonitoringCount()}`);
+}
+
   constructor(heartBot: HeartBot) {
     if (TelegramService.instance) {
       return TelegramService.instance;
@@ -114,6 +129,8 @@ export class TelegramService {
     this.bot.command('fetch', this.handleFetch.bind(this));
     this.bot.command('stop', this.handleStop.bind(this));
     this.bot.command('test', this.handleTest.bind(this));
+    this.bot.command('debug', this.handleDebugStatus.bind(this)); // ADD THIS LINE
+
 
     // Setup callbacks
     this.setupCallbacks();

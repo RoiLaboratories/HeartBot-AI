@@ -15,7 +15,15 @@ export class HeartBot {
   private monitoringEnabled: Map<string, boolean> = new Map();
   private serverStarted: boolean = false;
   private initializationPromise: Promise<void> | null = null;
-  private monitoringIntervalId: NodeJS.Timeout | undefined;
+  public monitoringIntervalId: NodeJS.Timeout | undefined;
+
+  // public getMonitoringIntervalId(): NodeJS.Timeout | undefined {
+  //   return this.monitoringIntervalId;
+  // }
+ 
+  getActiveMonitoringCount(): number {
+    return Array.from(this.monitoringEnabled.values()).filter(enabled => enabled).length;
+  }
 
   constructor() {
     this.pumpFun = new PumpFunService();
