@@ -324,30 +324,61 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
-      '💰 <b>Set Market Cap Range</b>\n\n' +
-      'Choose minimum market cap:',
-      {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([
-          [
-            Markup.button.callback('$10K', 'set_min_market_cap:10000'),
-            Markup.button.callback('$50K', 'set_min_market_cap:50000'),
-            Markup.button.callback('$100K', 'set_min_market_cap:100000')
-          ],
-          [
-            Markup.button.callback('$500K', 'set_min_market_cap:500000'),
-            Markup.button.callback('$1M', 'set_min_market_cap:1000000')
-          ],
-          [
-            Markup.button.callback('Skip', 'skip_market_cap'),
-            Markup.button.callback('Custom', 'custom_market_cap'),
-            Markup.button.callback('Back', 'start_filter')
-          ]
-        ])
-      }
-    );
-  }
+    try {
+        await ctx.editMessageText(
+            '💰 <b>Set Market Cap Range</b>\n\n' +
+            'Choose minimum market cap:',
+            {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([
+                    [
+                        Markup.button.callback('$10K', 'set_min_market_cap:10000'),
+                        Markup.button.callback('$50K', 'set_min_market_cap:50000'),
+                        Markup.button.callback('$100K', 'set_min_market_cap:100000')
+                    ],
+                    [
+                        Markup.button.callback('$500K', 'set_min_market_cap:500000'),
+                        Markup.button.callback('$1M', 'set_min_market_cap:1000000')
+                    ],
+                    [
+                        Markup.button.callback('Skip', 'skip_market_cap'),
+                        Markup.button.callback('Custom', 'custom_market_cap'),
+                        Markup.button.callback('Back', 'start_filter')
+                    ]
+                ])
+            }
+        );
+    } catch (error: any) {
+        if (error.description?.includes("message can't be edited")) {
+            // Send new message instead of editing
+            await ctx.reply(
+                '💰 <b>Set Market Cap Range</b>\n\n' +
+                'Choose minimum market cap:',
+                {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [
+                            Markup.button.callback('$10K', 'set_min_market_cap:10000'),
+                            Markup.button.callback('$50K', 'set_min_market_cap:50000'),
+                            Markup.button.callback('$100K', 'set_min_market_cap:100000')
+                        ],
+                        [
+                            Markup.button.callback('$500K', 'set_min_market_cap:500000'),
+                            Markup.button.callback('$1M', 'set_min_market_cap:1000000')
+                        ],
+                        [
+                            Markup.button.callback('Skip', 'skip_market_cap'),
+                            Markup.button.callback('Custom', 'custom_market_cap'),
+                            Markup.button.callback('Back', 'start_filter')
+                        ]
+                    ])
+                }
+            );
+        } else {
+            throw error; // Re-throw other errors
+        }
+    }
+}
 
   private async handleMinMarketCap(ctx: CustomContext) {
       const cb = ctx.callbackQuery as CallbackQuery.DataQuery;
