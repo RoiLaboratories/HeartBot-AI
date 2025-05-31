@@ -133,7 +133,7 @@ export class TelegramService {
     this.bot.action(/^set_min_market_cap:(\d+)$/, async (ctx) => await this.handleMinMarketCap(ctx));
     this.bot.action(/^set_max_market_cap:(\d+)$/, async (ctx) => await this.handleMaxMarketCap(ctx));
     this.bot.action('skip_market_cap', async (ctx) => await this.handleLiquidityStep(ctx));
-
+    this.bot.action('custom_min_market_cap', async (ctx) => await this.handleMinMarketCap(ctx));
     // Liquidity callbacks
     this.bot.action('filter_liquidity', async (ctx) => await this.handleLiquidityStep(ctx));
     this.bot.action(/^set_min_liquidity:(\d+)$/, async (ctx) => await this.handleMinLiquidity(ctx));
@@ -165,7 +165,6 @@ export class TelegramService {
     this.bot.action('save_filter', async (ctx) => await this.handleFilterSave(ctx));
     this.bot.action('start_filter', async (ctx) => await this.handleSetFilter(ctx));
   }
-
   private setupCustomInputMiddleware() {
     this.bot.on('text', async (ctx) => {
       const telegramId = ctx.from?.id.toString();
