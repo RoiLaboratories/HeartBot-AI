@@ -320,12 +320,23 @@ export class TelegramService {
     );
   }
 
+ private async safeEditOrReply(ctx: CustomContext, text: string, options: any) {
+        try {
+            return await ctx.editMessageText(text, options);
+        } catch (error: any) {
+            if (error.description?.includes("message can't be edited")) {
+                return await ctx.reply(text, options);
+            }
+            throw error;
+        }
+    }
+
   private async handleMarketCapStep(ctx: CustomContext) {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
     try {
-        await ctx.editMessageText(
+         await this.safeEditOrReply(ctx,
             '💰 <b>Set Market Cap Range</b>\n\n' +
             'Choose minimum market cap:',
             {
@@ -439,7 +450,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+     await this.safeEditOrReply(ctx,
       '💰 <b>Set Maximum Market Cap</b>\n\n' +
       'Choose maximum market cap:',
       {
@@ -513,7 +524,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+     await this.safeEditOrReply(ctx,
       '💧 <b>Set Liquidity Range</b>\n\n' +
       'Choose minimum liquidity:',
       {
@@ -547,7 +558,7 @@ export class TelegramService {
     const value = match[1];
 
     if (value === 'custom') {
-      await ctx.editMessageText(
+      await this.safeEditOrReply(ctx,
         '💧 <b>Enter Minimum Liquidity</b>\n\n' +
         'Please enter the minimum liquidity in USD:',
         {
@@ -587,7 +598,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+    await this.safeEditOrReply(ctx,
       '💧 <b>Set Maximum Liquidity</b>\n\n' +
       'Choose maximum liquidity:',
       {
@@ -621,7 +632,7 @@ export class TelegramService {
     const value = match[1];
 
     if (value === 'custom') {
-      await ctx.editMessageText(
+      await this.safeEditOrReply(ctx,
         '💧 <b>Enter Maximum Liquidity</b>\n\n' +
         'Please enter the maximum liquidity in USD:',
         {
@@ -661,7 +672,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+    await this.safeEditOrReply(ctx,
       '👥 <b>Set Holders Range</b>\n\n' +
       'Choose minimum number of holders:',
       {
@@ -695,7 +706,7 @@ export class TelegramService {
     const value = match[1];
 
     if (value === 'custom') {
-      await ctx.editMessageText(
+       await this.safeEditOrReply(ctx,
         '👥 <b>Enter Minimum Holders</b>\n\n' +
         'Please enter the minimum number of holders:',
         {
@@ -738,7 +749,7 @@ export class TelegramService {
     const state = this.filterStates.get(telegramId);
     const minHolders = state?.minHolders || 0;
 
-    await ctx.editMessageText(
+    await this.safeEditOrReply(ctx,
       '👥 <b>Set Maximum Holders</b>\n\n' +
       `Minimum: ${minHolders}\n` +
       'Choose the maximum number of holders:',
@@ -773,7 +784,7 @@ export class TelegramService {
     const value = match[1];
 
     if (value === 'custom') {
-      await ctx.editMessageText(
+      await this.safeEditOrReply(ctx,
         '👥 <b>Enter Maximum Holders</b>\n\n' +
         'Please enter the maximum number of holders:',
         {
@@ -813,7 +824,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+     await this.safeEditOrReply(ctx,
       '🔒 <b>Set Maximum Dev Tokens</b>\n\n' +
       'Choose maximum percentage of tokens held by developers:',
       {
@@ -847,7 +858,7 @@ export class TelegramService {
     const value = match[1];
 
     if (value === 'custom') {
-      await ctx.editMessageText(
+       await this.safeEditOrReply(ctx,
         '🔒 <b>Enter Maximum Dev Tokens</b>\n\n' +
         'Please enter the maximum percentage of tokens held by developers:',
         {
@@ -887,7 +898,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+     await this.safeEditOrReply(ctx,
       '⏰ <b>Set Minimum Contract Age</b>\n\n' +
       'Choose minimum age of the contract in hours:',
       {
@@ -932,7 +943,7 @@ export class TelegramService {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    await ctx.editMessageText(
+     await this.safeEditOrReply(ctx,
       '🔄 <b>Set Trading Status</b>\n\n' +
       'Choose trading status:',
       {
@@ -1000,7 +1011,7 @@ export class TelegramService {
 
     message += '\nWould you like to save this filter?';
 
-    await ctx.editMessageText(message, {
+    await this.safeEditOrReply(ctx, message, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
         [
@@ -1054,21 +1065,19 @@ export class TelegramService {
       }
 
       this.filterStates.delete(telegramId);
-      await ctx.editMessageText('✅ Filter saved successfully! You will receive alerts for tokens matching your criteria.');
+      await this.safeEditOrReply(ctx, '✅ Filter saved successfully! You will receive alerts for tokens matching your criteria.', { parse_mode: 'HTML' });
     } catch (error) {
       console.error('[DEBUG] Error saving filter:', error);
-      await ctx.editMessageText('❌ Error saving filter. Please try again later.');
+      await this.safeEditOrReply(ctx, '❌ Error saving filter. Please try again later.', { parse_mode: 'HTML' });
     }
-  }
-
-  private async handleFilterCancel(ctx: CustomContext) {
+  }  private async handleFilterCancel(ctx: CustomContext) {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
     // Clear the filter state
     this.filterStates.delete(telegramId);
 
-    await ctx.editMessageText('❌ Filter creation cancelled.');
+    await this.safeEditOrReply(ctx, '❌ Filter creation cancelled.',  { parse_mode: 'HTML' });
   }
 
   async sendTokenAlert(userId: string, token: TokenData) {

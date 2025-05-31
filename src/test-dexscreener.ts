@@ -1,3 +1,4 @@
+/*
 import { DexscreenerService } from './services/dexscreener';
 
 async function testDexscreener() {
@@ -18,3 +19,4 @@ async function testDexscreener() {
 }
 
 testDexscreener().catch(console.error); 
+*/
