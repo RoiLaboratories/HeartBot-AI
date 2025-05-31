@@ -357,7 +357,8 @@ export class TelegramService {
 
     const value = match[1];
 
-    if (value === 'Custom') {
+    if (value === 'custom') {
+      await ctx.answerCbQuery(); 
       await ctx.editMessageText(
         '💰 <b>Enter Minimum Market Cap</b>\n\n' +
         'Please enter the minimum market cap in USD:',
