@@ -1169,6 +1169,7 @@ export class TelegramService {
     await this.safeEditOrReply(ctx, '❌ Filter creation cancelled.',  { parse_mode: 'HTML' });
   }
 
+  
   async sendTokenAlert(userId: string, token: TokenData) {
     const message = this.formatTokenAlert(token);
     await this.bot.telegram.sendMessage(userId, message, { parse_mode: 'HTML' });
@@ -1192,6 +1193,9 @@ export class TelegramService {
 
     if (error) {
       console.error('Error logging token alert:', error);
+
+      console.log(`[DEBUG] Sending alert to ${userId} for token ${token.name}`);
+
     }
   }
 
