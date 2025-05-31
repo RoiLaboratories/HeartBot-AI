@@ -1754,12 +1754,29 @@ export class TelegramService {
       // Enable monitoring for this user
       this.heartBot.enableMonitoring(userId);
       await ctx.reply('✅ Token monitoring started! You will receive alerts for new tokens that match your filters every 60 seconds.');
-    } catch (error) {
-      console.error('Error starting monitoring:', error);
-      await ctx.reply('❌ Error starting token monitoring. Please try again later.');
-    }
-  }
+    // } catch (error) {
+    //   console.error('Error starting monitoring:', error);
+    //   await ctx.reply('❌ Error starting token monitoring. Please try again later.');
 
+      const testToken: TokenData = {
+      address: '0x123',
+      name: 'TestToken',
+      symbol: 'TTK',
+      marketCap: 50000,
+      liquidity: 10000,
+      fdv: 100000,
+      holdersCount: 120,
+      tradingEnabled: true,
+      contractAge: 1,
+      devTokensPercentage: 5,
+    };
+    await this.sendTokenAlert(userId, testToken);
+  } catch (error) {
+    console.error('Error starting monitoring:', error);
+    await ctx.reply('❌ Error starting token monitoring. Please try again later.');
+  }
+}
+    
   private async handleStop(ctx: Context) {
     const userId = ctx.from?.id.toString();
     if (!userId) {
