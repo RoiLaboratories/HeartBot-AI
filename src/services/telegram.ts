@@ -47,6 +47,7 @@ export class TelegramService {
   private filterStates: Map<string, FilterState> = new Map();
   private customInputHandlers: Map<string, (ctx: CustomContext) => Promise<void>> = new Map();
   private heartBot: HeartBot = null!;
+  telegram: any;
 
   private async handleDebugStatus(ctx: Context) {
     const userId = ctx.from?.id.toString();
@@ -1743,22 +1744,24 @@ export class TelegramService {
     return true;
   }
 
-  private async handleFetch(ctx: Context) {
-    const userId = ctx.from?.id.toString();
-    if (!userId) {
-      await ctx.reply('❌ Error: Could not identify user');
-      return;
-    }
+ private async handleFetch(ctx: Context) {
+  const userId = ctx.from?.id.toString();
+  if (!userId) {
+    await ctx.reply('❌ Error: Could not identify user');
+    return;
+  }
 
-    try {
-      // Enable monitoring for this user
-      this.heartBot.enableMonitoring(userId);
-      await ctx.reply('✅ Token monitoring started! You will receive alerts for new tokens that match your filters every 60 seconds.');
-    // } catch (error) {
-    //   console.error('Error starting monitoring:', error);
-    //   await ctx.reply('❌ Error starting token monitoring. Please try again later.');
+  try {
+    // Enable monitoring for this user
+    this.heartBot.enableMonitoring(userId);
 
-      const testToken: TokenData = {
+    // Optionally start the monitoring loop (only starts if not already running)
+    this.heartBot.startMonitoringLoop();
+
+    await ctx.reply('✅ Token monitoring started! You will receive alerts when new tokens match your filters.');
+
+    // Optional: Send a test alert to confirm
+    const testToken: TokenData = {
       address: '0x123',
       name: 'TestToken',
       symbol: 'TTK',
@@ -1770,12 +1773,14 @@ export class TelegramService {
       contractAge: 1,
       devTokensPercentage: 5,
     };
-    await this.sendTokenAlert(userId, testToken);
+
+    await this.telegram.sendTokenAlert(userId, testToken);
   } catch (error) {
-    console.error('Error starting monitoring:', error);
+    console.error('[handleFetch] Error starting monitoring:', error);
     await ctx.reply('❌ Error starting token monitoring. Please try again later.');
   }
 }
+
     
   private async handleStop(ctx: Context) {
     const userId = ctx.from?.id.toString();

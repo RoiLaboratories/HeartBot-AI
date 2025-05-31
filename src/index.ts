@@ -10,7 +10,7 @@ export class HeartBot {
   public telegram: TelegramService;
   private pumpFun: PumpFunService;
   private server: FastifyInstance;
-  public isRunning: boolean = false;
+  public isRunning: boolean = true;
   private adminClient;
   private monitoringEnabled: Map<string, boolean> = new Map();
   private serverStarted: boolean = false;
@@ -27,6 +27,7 @@ export class HeartBot {
     for (const [userId, enabled] of this.monitoringEnabled.entries()) {
       if (!enabled) continue;
 
+      console.log(`[DEBUG] Monitoring loop cycle running at ${new Date().toISOString()}`);
       console.log(`[HeartBot] Scanning for new tokens for user ${userId}`);
       try {
         const tokens = await this.pumpFun.getNewTokens(userId); // implement this method in PumpFunService
@@ -37,11 +38,13 @@ export class HeartBot {
         }
 
         for (const token of tokens) {
+          
           await this.telegram.sendTokenAlert(userId, token);
         }
 
       } catch (error) {
         console.error(`[HeartBot] Error during scan for user ${userId}:`, error);
+        
       }
     }
   }, 60 * 1000); // every 60 seconds

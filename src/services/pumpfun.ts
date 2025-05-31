@@ -13,8 +13,8 @@ export class PumpFunService {
     console.log('Resetting last checked timestamp...');
     this.lastCheckedTimestamp = 0;
   }
-
-  async getNewTokens(_userId: string): Promise<TokenData[]> {
+  private lastSeenTokens: Record<string, Set<string>> = {};
+  async getNewTokens(userId: string): Promise<TokenData[]> {
     try {
       console.log('[DEBUG] Fetching new tokens from Moralis...');
       const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
@@ -42,9 +42,23 @@ export class PumpFunService {
 
       console.log(`[DEBUG] Found ${tokens.length} tokens from Moralis`);
 
+       if (!this.lastSeenTokens[userId]) {
+       this.lastSeenTokens[userId] = new Set();
+    }
+
+     const seen = this.lastSeenTokens[userId];
+
       const newTokens: TokenData[] = [];
 
       for (const token of tokens) {
+
+         if (!token?.address) continue;
+         if (seen.has(token.address)) {
+        continue; // skip already seen
+      }
+
+      seen.add(token.address); // mark as seen
+
         try {
           // Skip tokens without required data
           if (!token.tokenAddress || !token.name || !token.symbol) {
