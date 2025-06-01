@@ -45,6 +45,7 @@ export class HeartBot {
       } catch (error) {
         console.error(`[HeartBot] Error during scan for user ${userId}:`, error);
         
+        
       }
     }
   }, 60 * 1000); // every 60 seconds

@@ -1774,6 +1774,7 @@ export class TelegramService {
       devTokensPercentage: 5,
     };
 
+     console.log(`[DEBUG] Preparing to send token alert to user ${userId}`);
     await this.sendTokenAlert(userId, testToken);
   } catch (error) {
     console.error('[handleFetch] Error starting monitoring:', error);
