@@ -27,7 +27,9 @@ export class PumpFunService {
         },
         timeout: 30000 // Increased timeout to 30 seconds
       });
-
+        // Add timestamp tracking
+      const currentTime = Date.now();
+      console.log(`[DEBUG] Last checked: ${this.lastCheckedTimestamp}, Current: ${currentTime}`);
       console.log('[DEBUG] Moralis API Response:', JSON.stringify(response.data, null, 2));
 
       // Handle both array and object with data property
