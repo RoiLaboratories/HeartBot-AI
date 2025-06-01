@@ -1195,7 +1195,7 @@ export class TelegramService {
     if (error) {
       console.error('Error logging token alert:', error);
 
-      console.log(`[DEBUG] Sending alert to ${userId} for token ${token.name}`);
+      // console.log(`[DEBUG] Sending alert to ${userId} for token ${token.name}`);
 
     }
   }
