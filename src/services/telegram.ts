@@ -1737,7 +1737,7 @@ export class TelegramService {
     }
 
     // Trading status filter
-    if (filter.trading_status !== null && token.tradingEnabled !== filter.trading_status) {
+    if (filter.trading_enabled !== null && token.tradingEnabled !== filter.trading_enabled) {
       console.log(`❌ Trading status ${token.tradingEnabled} != required ${filter.trading_enabled}`);
       return false;
     }
