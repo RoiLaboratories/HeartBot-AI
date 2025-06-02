@@ -129,9 +129,9 @@ export class TelegramService {
     this.bot.command('deletefilter', this.handleDeleteFilter.bind(this));
     
     // Monitoring commands
-    this.bot.command('fetch', this.handleFetch.bind(this));
+    // this.bot.command('fetch', this.handleFetch.bind(this));
     this.bot.command('stop', this.handleStop.bind(this));
-    this.bot.command('test', this.handleTest.bind(this));
+    this.bot.command('fetch', this.handleFetch.bind(this));
     this.bot.command('debug', this.handleDebugStatus.bind(this)); // ADD THIS LINE
 
 
@@ -215,7 +215,7 @@ export class TelegramService {
         { command: 'setfilter', description: 'Set your token alert filters' },
         { command: 'myfilters', description: 'View your current filters' },
         { command: 'deletefilter', description: 'Delete a filter' },
-        { command: 'fetch', description: 'Start monitoring for new tokens' },
+        { command: 'fetch', description: 'Start fetching new tokens' },
         { command: 'stop', description: 'Stop monitoring for new tokens' },
         { command: 'help', description: 'Show help message' }
       ];
@@ -311,7 +311,7 @@ export class TelegramService {
         "• /setfilter - Configure your alert filters\n" +
         "• /myfilters - View your current filters\n" +
         "• /deletefilter - Delete a filter\n" +
-        "• /fetch - Start monitoring for new tokens\n" +
+        "• /fetch - Start fetching new tokens\n" +
         "• /stop - Stop monitoring for new tokens\n" +
         "• /help - Show all commands\n\n" +
         "🚀 <i>Get started by setting up your first filter!</i>",
@@ -1476,7 +1476,7 @@ export class TelegramService {
       '• /setfilter - Set up a new token alert filter\n' +
       '• /myfilters - View your active filters\n' +
       '• /deletefilter [id] - Delete a specific filter\n' +
-      '• /fetch - Start monitoring for new tokens\n' +
+      '• /fetch - Start fetching new tokens\n' +
       '• /stop - Stop monitoring for new tokens\n' +
       '• /help - Show this help message\n\n' +
       '<b>Filter Criteria:</b>\n' +
@@ -1498,12 +1498,12 @@ export class TelegramService {
     );
   }
 
-  private async handleTest(ctx: CustomContext) {
+  private async handleFetch(ctx: CustomContext) {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
     try {
-      await ctx.reply('🔍 Testing token alerts...');
+      await ctx.reply('🔍 Fetching token alerts...');
 
       // Get user's active filters
       const { data: filters, error } = await this.adminClient
@@ -1747,43 +1747,43 @@ export class TelegramService {
     return true;
   }
 
- private async handleFetch(ctx: Context) {
-  const userId = ctx.from?.id.toString();
-  if (!userId) {
-    await ctx.reply('❌ Error: Could not identify user');
-    return;
-  }
+//  private async handleFetch(ctx: Context) {
+//   const userId = ctx.from?.id.toString();
+//   if (!userId) {
+//     await ctx.reply('❌ Error: Could not identify user');
+//     return;
+//   }
 
-  try {
-    // Enable monitoring for this user
-    this.heartBot.enableMonitoring(userId);
+//   try {
+//     // Enable monitoring for this user
+//     this.heartBot.enableMonitoring(userId);
 
-    // Optionally start the monitoring loop (only starts if not already running)
-    this.heartBot.startMonitoringLoop();
+//     // Optionally start the monitoring loop (only starts if not already running)
+//     this.heartBot.startMonitoringLoop();
 
-    await ctx.reply('✅ Token monitoring started! You will receive alerts when new tokens match your filters.');
+//     await ctx.reply('✅ Token monitoring started! You will receive alerts when new tokens match your filters.');
 
-    // Optional: Send a test alert to confirm
-    const testToken: TokenData = {
-      address: '0x123',
-      name: 'TestToken',
-      symbol: 'TTK',
-      marketCap: 50000,
-      liquidity: 10000,
-      fdv: 100000,
-      holdersCount: 120,
-      tradingEnabled: true,
-      contractAge: 1,
-      devTokensPercentage: 5,
-    };
+//     // Optional: Send a test alert to confirm
+//     const testToken: TokenData = {
+//       address: '0x123',
+//       name: 'TestToken',
+//       symbol: 'TTK',
+//       marketCap: 50000,
+//       liquidity: 10000,
+//       fdv: 100000,
+//       holdersCount: 120,
+//       tradingEnabled: true,
+//       contractAge: 1,
+//       devTokensPercentage: 5,
+//     };
 
-     console.log(`[DEBUG] Preparing to send token alert to user ${userId}`);
-    await this.sendTokenAlert(userId, testToken);
-  } catch (error) {
-    console.error('[handleFetch] Error starting monitoring:', error);
-    await ctx.reply('❌ Error starting token monitoring. Please try again later.');
-  }
-}
+//      console.log(`[DEBUG] Preparing to send token alert to user ${userId}`);
+//     await this.sendTokenAlert(userId, testToken);
+//   } catch (error) {
+//     console.error('[handleFetch] Error starting monitoring:', error);
+//     await ctx.reply('❌ Error starting token monitoring. Please try again later.');
+//   }
+// }
 
     
   private async handleStop(ctx: Context) {
@@ -1796,7 +1796,7 @@ export class TelegramService {
     try {
       // Disable monitoring for this user
       this.heartBot.disableMonitoring(userId);
-      await ctx.reply('🛑 Token monitoring stopped. You will no longer receive automatic alerts.');
+      await ctx.reply('🛑 Token fetching stopped. You will no longer receive new token alerts.');
     } catch (error) {
       console.error('Error stopping monitoring:', error);
       await ctx.reply('❌ Error stopping token monitoring. Please try again later.');
