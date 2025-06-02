@@ -35,16 +35,16 @@ export class HeartBot {
         if (tokens.length === 0) {
           console.log(`[HeartBot] No tokens matched for user ${userId}`);
           continue;
+        }
 
-          // Add this after "Successfully fetched X new tokens"
+        // Debug logging for sample token data
         if (tokens.length > 0) {
-        console.log('[DEBUG] Sample token data:', {
-        name: tokens[0].name,
-        marketCap: tokens[0].marketCap,
-        liquidity: tokens[0].liquidity,
-        address: tokens[0].address
-    });
-}
+          console.log('[DEBUG] Sample token data:', {
+            name: tokens[0].name,
+            marketCap: tokens[0].marketCap,
+            liquidity: tokens[0].liquidity,
+            address: tokens[0].address
+          });
         }
 
         for (const token of tokens) {
