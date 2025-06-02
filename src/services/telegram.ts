@@ -1,12 +1,12 @@
 import { Telegraf, Context, Markup } from 'telegraf';
 import { CallbackQuery } from 'telegraf/typings/core/types/typegram';
+import dotenv from 'dotenv';
 import { config } from '../config';
 import { TokenData } from '../types';
 import { createClient } from '@supabase/supabase-js';
 // import { DexscreenerService } from '../services/dexscreener';
 import axios from 'axios';
 import { HeartBot } from '../index';
-import dotenv from 'dotenv';
 dotenv.config();
 
 interface FilterState {
