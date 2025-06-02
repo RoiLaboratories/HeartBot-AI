@@ -24,7 +24,7 @@ export const config = {
   },
   moralis: {
     apiKey: process.env.MORALIS_API_KEY,
-    tokenFetchLimit: parseInt(process.env.MORALIS_TOKEN_FETCH_LIMIT || '100')
+    tokenFetchLimit: parseInt(process.env.MORALIS_TOKEN_FETCH_LIMIT || '10')
   },
   birdeye: {
     apiKey: process.env.BIRDEYE_API_KEY
