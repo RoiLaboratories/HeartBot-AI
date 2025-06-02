@@ -6,6 +6,8 @@ import { createClient } from '@supabase/supabase-js';
 // import { DexscreenerService } from '../services/dexscreener';
 import axios from 'axios';
 import { HeartBot } from '../index';
+import dotenv from 'dotenv';
+dotenv.config();
 
 interface FilterState {
   minMarketCap?: number;
@@ -1540,6 +1542,7 @@ export class TelegramService {
             timeout: 10000 // 10 second timeout
           });
 
+          console.log('Fetch limit from .env:', process.env.MORALIS_TOKEN_FETCH_LIMIT);
           console.log('[DEBUG] Moralis API Response Status:', response.status);
           console.log('[DEBUG] Response type:', typeof response.data);
           console.log('[DEBUG] Is Array?', Array.isArray(response.data));
