@@ -604,9 +604,9 @@ export default async function handler(req: any, res: any) {
     if (process.env.NODE_ENV === 'production' && req.method === 'POST') {
       console.log('[DEBUG] Received webhook update:', JSON.stringify(req.body));
       try {
-        // Use webhook middleware for proper request handling
-        const middleware = heartBot.telegram.getWebhookMiddleware();
-        await middleware(req, res);
+        // Handle update directly
+        await heartBot.telegram.handleUpdate(req.body);
+        res.status(200).json({ status: 'ok' });
         return;
       } catch (error) {
         console.error('[DEBUG] Error handling webhook update:', error);

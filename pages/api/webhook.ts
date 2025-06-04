@@ -95,12 +95,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Check if we have a valid update
-    if (!req.body || !req.body.update_id) {
-      console.error('[DEBUG] Invalid update received:', req.body);
+    if (!req.body) {
+      console.error('[DEBUG] No request body received');
+      res.status(400).json({ 
+        status: 'error', 
+        message: 'Missing request body'
+      });
+      return;
+    }
+
+    // Validate update structure
+    const update = req.body;
+    if (
+      !update.update_id || 
+      !(update.message || update.callback_query)
+    ) {
+      console.error('[DEBUG] Invalid update format:', update);
       res.status(400).json({ 
         status: 'error', 
         message: 'Invalid update format',
-        body: req.body
+        update: update
       });
       return;
     }
@@ -143,9 +157,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle Telegram webhook updates
     try {
       console.log('[DEBUG] Processing update:', req.body);
-      const middleware = heartBot.telegram.getWebhookMiddleware();
-      await middleware(req, res);
+      await heartBot.telegram.handleUpdate(req.body);
       console.log('[DEBUG] Update processed successfully');
+      res.status(200).json({ status: 'ok' });
       return;
     } catch (error) {
       console.error('[DEBUG] Error handling webhook update:', error);
