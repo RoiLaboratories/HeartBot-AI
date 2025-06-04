@@ -1549,33 +1549,62 @@ export class TelegramService {
   public matchesFilter(token: TokenData, filter: any): boolean {
     console.log(`[DEBUG] Checking token ${token.address} against filter:`, filter);
 
-    // Skip holder checks for now as we don't have that data
-    if (filter.min_holders || filter.max_holders) {
-      console.log('[DEBUG] Skipping holder checks - data not available');
-      return false;
-    }
-
     // Market cap check
-    if (filter.min_market_cap && (!token.marketCap || token.marketCap < filter.min_market_cap)) {
-      console.log(`[DEBUG] Failed min market cap check: ${token.marketCap} < ${filter.min_market_cap}`);
-      return false;
+    if (filter.min_market_cap && token.marketCap !== undefined) {
+      if (token.marketCap < filter.min_market_cap) {
+        console.log(`[DEBUG] Failed min market cap check: ${token.marketCap} < ${filter.min_market_cap}`);
+        return false;
+      }
     }
-    if (filter.max_market_cap && (!token.marketCap || token.marketCap > filter.max_market_cap)) {
-      console.log(`[DEBUG] Failed max market cap check: ${token.marketCap} > ${filter.max_market_cap}`);
-      return false;
+    
+    if (filter.max_market_cap && token.marketCap !== undefined) {
+      if (token.marketCap > filter.max_market_cap) {
+        console.log(`[DEBUG] Failed max market cap check: ${token.marketCap} > ${filter.max_market_cap}`);
+        return false;
+      }
     }
 
     // Liquidity check
-    if (filter.min_liquidity && (!token.liquidity || token.liquidity < filter.min_liquidity)) {
-      console.log(`[DEBUG] Failed min liquidity check: ${token.liquidity} < ${filter.min_liquidity}`);
-      return false;
+    if (filter.min_liquidity && token.liquidity !== undefined) {
+      if (token.liquidity < filter.min_liquidity) {
+        console.log(`[DEBUG] Failed min liquidity check: ${token.liquidity} < ${filter.min_liquidity}`);
+        return false;
+      }
     }
-    if (filter.max_liquidity && (!token.liquidity || token.liquidity > filter.max_liquidity)) {
-      console.log(`[DEBUG] Failed max liquidity check: ${token.liquidity} > ${filter.max_liquidity}`);
-      return false;
+    
+    if (filter.max_liquidity && token.liquidity !== undefined) {
+      if (token.liquidity > filter.max_liquidity) {
+        console.log(`[DEBUG] Failed max liquidity check: ${token.liquidity} > ${filter.max_liquidity}`);
+        return false;
+      }
+    }
+
+    // Holders check - skip if data not available
+    if ((filter.min_holders || filter.max_holders) && token.holdersCount === undefined) {
+      console.log('[DEBUG] Skipping holder checks - data not available');
+      return true; // Skip check instead of failing
+    }
+
+    if (filter.min_holders && token.holdersCount !== undefined) {
+      if (token.holdersCount < filter.min_holders) {
+        console.log(`[DEBUG] Failed min holders check: ${token.holdersCount} < ${filter.min_holders}`);
+        return false;
+      }
+    }
+
+    if (filter.max_holders && token.holdersCount !== undefined) {
+      if (token.holdersCount > filter.max_holders) {
+        console.log(`[DEBUG] Failed max holders check: ${token.holdersCount} > ${filter.max_holders}`);
+        return false;
+      }
     }
 
     // Dev tokens check - skip if not available
+    if (filter.max_dev_tokens && token.devTokensPercentage === undefined) {
+      console.log('[DEBUG] Skipping dev tokens check - data not available');
+      return true; // Skip check instead of failing
+    }
+
     if (filter.max_dev_tokens && token.devTokensPercentage !== undefined) {
       if (token.devTokensPercentage > filter.max_dev_tokens) {
         console.log(`[DEBUG] Failed max dev tokens check: ${token.devTokensPercentage} > ${filter.max_dev_tokens}`);
@@ -1584,23 +1613,28 @@ export class TelegramService {
     }
 
     // Contract age check - skip if not available
-    if (filter.min_contract_age && (!token.contractAge || token.contractAge < filter.min_contract_age)) {
-      console.log(`[DEBUG] Failed min contract age check: ${token.contractAge} < ${filter.min_contract_age}`);
-      return false;
+    if (filter.min_contract_age && token.contractAge === undefined) {
+      console.log('[DEBUG] Skipping contract age check - data not available');
+      return true; // Skip check instead of failing
     }
 
-    // Trading status check
-    if (filter.trading_enabled !== undefined) {
-      console.log(`[DEBUG] Checking trading status - Token: ${token.tradingEnabled}, Filter requires: ${filter.trading_enabled}`);
-      if (token.tradingEnabled !== filter.trading_enabled) {
-        console.log(`[DEBUG] Failed trading status check: Token ${token.tradingEnabled ? 'is' : 'is not'} trading, but filter requires ${filter.trading_enabled ? 'trading' : 'not trading'}`);
+    if (filter.min_contract_age && token.contractAge !== undefined) {
+      if (token.contractAge < filter.min_contract_age) {
+        console.log(`[DEBUG] Failed min contract age check: ${token.contractAge} < ${filter.min_contract_age}`);
         return false;
-      } else {
-        console.log(`[DEBUG] Passed trading status check`);
       }
     }
 
-    console.log(`[DEBUG] Token ${token.address} matches all filter criteria`);
+    // Trading status check
+    if (filter.trading_enabled !== undefined && token.tradingEnabled !== undefined) {
+      if (token.tradingEnabled !== filter.trading_enabled) {
+        console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_enabled}`);
+        return false;
+      }
+    }
+
+    // All checks passed
+    console.log(`[DEBUG] Token ${token.address} matched all filter criteria`);
     return true;
   }
 
