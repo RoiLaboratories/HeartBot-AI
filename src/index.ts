@@ -40,28 +40,33 @@ export class HeartBot {
 
       try {
         isProcessing = true;
-        console.log('[DEBUG] ===== Starting New Monitoring Cycle =====');
+        const now = new Date().toISOString();
+        console.log(`\n[DEBUG] ===== Starting New Monitoring Cycle at ${now} =====`);
 
         // Get active users
         const activeUsers = Array.from(this.monitoringEnabled.entries())
           .filter(([_, enabled]) => enabled)
           .map(([userId, _]) => userId);
 
+        console.log(`[DEBUG] Active users: ${JSON.stringify(activeUsers)}`);
+        console.log(`[DEBUG] Monitoring status map:`, Object.fromEntries(this.monitoringEnabled));
+
         if (activeUsers.length === 0) {
           console.log('[DEBUG] No active users, skipping cycle');
+          isProcessing = false;
           return;
         }
 
         // Process each active user
         for (const userId of activeUsers) {
           try {
-            // Check if user is still enabled (might have been disabled during processing)
+            // Double check if user is still enabled
             if (!this.monitoringEnabled.get(userId)) {
               console.log(`[DEBUG] Monitoring disabled for user ${userId}, skipping`);
               continue;
             }
 
-            console.log(`[DEBUG] Processing user ${userId} at ${new Date().toISOString()}`);
+            console.log(`\n[DEBUG] Processing user ${userId} at ${new Date().toISOString()}`);
 
             // Get user's active filters
             const { data: filters, error } = await this.adminClient
@@ -80,27 +85,36 @@ export class HeartBot {
               continue;
             }
 
+            // Log filter details
+            console.log(`[DEBUG] Found ${filters.length} active filters for user ${userId}:`);
+            filters.forEach((filter, index) => {
+              console.log(`[DEBUG] Filter ${index + 1}:`, filter);
+            });
+
             // Fetch new tokens with retry logic
+            console.log(`[DEBUG] Fetching new tokens for user ${userId}...`);
             const tokens = await this.pumpFun.getNewTokens(userId);
+            console.log(`[DEBUG] Fetched ${tokens.length} new tokens for user ${userId}`);
 
             if (tokens.length === 0) {
               console.log(`[DEBUG] No new tokens found for user ${userId}`);
               continue;
             }
 
-            console.log(`[DEBUG] Found ${tokens.length} new tokens, checking against ${filters.length} filters`);
-
-            // Check each token against filters
+            let alertsSent = 0;
             for (const token of tokens) {
+              console.log(`\n[DEBUG] Processing token ${token.address}`);
               let matched = false;
               
               for (const filter of filters) {
                 try {
                   if (this.telegram.matchesFilter(token, filter)) {
-                    console.log(`[DEBUG] Token ${token.address} matched filter for user ${userId}`);
+                    console.log(`[DEBUG] Token ${token.address} matched filter for user ${userId}. Sending alert...`);
                     await this.telegram.sendTokenAlert(userId, token);
+                    console.log(`[DEBUG] Alert sent successfully for token ${token.address}`);
                     matched = true;
-                    break; // Skip remaining filters once we have a match
+                    alertsSent++;
+                    break;
                   }
                 } catch (error) {
                   console.error(`[DEBUG] Error checking token ${token.address} against filter:`, error);
@@ -112,6 +126,8 @@ export class HeartBot {
                 console.log(`[DEBUG] Token ${token.address} did not match any filters for user ${userId}`);
               }
             }
+            console.log(`[DEBUG] Sent ${alertsSent} alerts for user ${userId} in this cycle`);
+
           } catch (error) {
             console.error(`[DEBUG] Error processing user ${userId}:`, error);
             continue;

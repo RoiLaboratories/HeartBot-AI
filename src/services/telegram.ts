@@ -1547,10 +1547,20 @@ export class TelegramService {
   }
 
   public matchesFilter(token: TokenData, filter: any): boolean {
-    console.log(`[DEBUG] Checking token ${token.address} against filter:`, filter);
+    console.log(`\n[DEBUG] ==== Checking Filter Match for ${token.address} ====`);
+    console.log(`[DEBUG] Token data:`, {
+      marketCap: token.marketCap,
+      liquidity: token.liquidity,
+      holdersCount: token.holdersCount,
+      devTokensPercentage: token.devTokensPercentage,
+      contractAge: token.contractAge,
+      tradingEnabled: token.tradingEnabled
+    });
+    console.log(`[DEBUG] Filter criteria:`, filter);
 
     // Market cap check
     if (filter.min_market_cap && token.marketCap !== undefined) {
+      console.log(`[DEBUG] Checking min market cap: ${token.marketCap} >= ${filter.min_market_cap}`);
       if (token.marketCap < filter.min_market_cap) {
         console.log(`[DEBUG] Failed min market cap check: ${token.marketCap} < ${filter.min_market_cap}`);
         return false;
@@ -1558,6 +1568,7 @@ export class TelegramService {
     }
     
     if (filter.max_market_cap && token.marketCap !== undefined) {
+      console.log(`[DEBUG] Checking max market cap: ${token.marketCap} <= ${filter.max_market_cap}`);
       if (token.marketCap > filter.max_market_cap) {
         console.log(`[DEBUG] Failed max market cap check: ${token.marketCap} > ${filter.max_market_cap}`);
         return false;
@@ -1566,6 +1577,7 @@ export class TelegramService {
 
     // Liquidity check
     if (filter.min_liquidity && token.liquidity !== undefined) {
+      console.log(`[DEBUG] Checking min liquidity: ${token.liquidity} >= ${filter.min_liquidity}`);
       if (token.liquidity < filter.min_liquidity) {
         console.log(`[DEBUG] Failed min liquidity check: ${token.liquidity} < ${filter.min_liquidity}`);
         return false;
@@ -1573,6 +1585,7 @@ export class TelegramService {
     }
     
     if (filter.max_liquidity && token.liquidity !== undefined) {
+      console.log(`[DEBUG] Checking max liquidity: ${token.liquidity} <= ${filter.max_liquidity}`);
       if (token.liquidity > filter.max_liquidity) {
         console.log(`[DEBUG] Failed max liquidity check: ${token.liquidity} > ${filter.max_liquidity}`);
         return false;
@@ -1582,30 +1595,29 @@ export class TelegramService {
     // Holders check - skip if data not available
     if ((filter.min_holders || filter.max_holders) && token.holdersCount === undefined) {
       console.log('[DEBUG] Skipping holder checks - data not available');
-      return true; // Skip check instead of failing
-    }
-
-    if (filter.min_holders && token.holdersCount !== undefined) {
-      if (token.holdersCount < filter.min_holders) {
-        console.log(`[DEBUG] Failed min holders check: ${token.holdersCount} < ${filter.min_holders}`);
-        return false;
+    } else {
+      if (filter.min_holders && token.holdersCount !== undefined) {
+        console.log(`[DEBUG] Checking min holders: ${token.holdersCount} >= ${filter.min_holders}`);
+        if (token.holdersCount < filter.min_holders) {
+          console.log(`[DEBUG] Failed min holders check: ${token.holdersCount} < ${filter.min_holders}`);
+          return false;
+        }
       }
-    }
 
-    if (filter.max_holders && token.holdersCount !== undefined) {
-      if (token.holdersCount > filter.max_holders) {
-        console.log(`[DEBUG] Failed max holders check: ${token.holdersCount} > ${filter.max_holders}`);
-        return false;
+      if (filter.max_holders && token.holdersCount !== undefined) {
+        console.log(`[DEBUG] Checking max holders: ${token.holdersCount} <= ${filter.max_holders}`);
+        if (token.holdersCount > filter.max_holders) {
+          console.log(`[DEBUG] Failed max holders check: ${token.holdersCount} > ${filter.max_holders}`);
+          return false;
+        }
       }
     }
 
     // Dev tokens check - skip if not available
     if (filter.max_dev_tokens && token.devTokensPercentage === undefined) {
       console.log('[DEBUG] Skipping dev tokens check - data not available');
-      return true; // Skip check instead of failing
-    }
-
-    if (filter.max_dev_tokens && token.devTokensPercentage !== undefined) {
+    } else if (filter.max_dev_tokens && token.devTokensPercentage !== undefined) {
+      console.log(`[DEBUG] Checking max dev tokens: ${token.devTokensPercentage} <= ${filter.max_dev_tokens}`);
       if (token.devTokensPercentage > filter.max_dev_tokens) {
         console.log(`[DEBUG] Failed max dev tokens check: ${token.devTokensPercentage} > ${filter.max_dev_tokens}`);
         return false;
@@ -1615,10 +1627,8 @@ export class TelegramService {
     // Contract age check - skip if not available
     if (filter.min_contract_age && token.contractAge === undefined) {
       console.log('[DEBUG] Skipping contract age check - data not available');
-      return true; // Skip check instead of failing
-    }
-
-    if (filter.min_contract_age && token.contractAge !== undefined) {
+    } else if (filter.min_contract_age && token.contractAge !== undefined) {
+      console.log(`[DEBUG] Checking min contract age: ${token.contractAge} >= ${filter.min_contract_age}`);
       if (token.contractAge < filter.min_contract_age) {
         console.log(`[DEBUG] Failed min contract age check: ${token.contractAge} < ${filter.min_contract_age}`);
         return false;
@@ -1627,14 +1637,14 @@ export class TelegramService {
 
     // Trading status check
     if (filter.trading_enabled !== undefined && token.tradingEnabled !== undefined) {
+      console.log(`[DEBUG] Checking trading status: ${token.tradingEnabled} === ${filter.trading_enabled}`);
       if (token.tradingEnabled !== filter.trading_enabled) {
         console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_enabled}`);
         return false;
       }
     }
 
-    // All checks passed
-    console.log(`[DEBUG] Token ${token.address} matched all filter criteria`);
+    console.log(`[DEBUG] Token ${token.address} passed all filter checks ✅`);
     return true;
   }
 

@@ -14,25 +14,36 @@ export class PumpFunService {
     console.log('[DEBUG] Resetting last checked timestamp and clearing token cache');
     this.lastCheckedTimestamp = Date.now() - (15 * 60 * 1000); // Start from 15 minutes ago
     this.lastSeenTokens.clear();
+    console.log(`[DEBUG] New lastCheckedTimestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
   }
 
   async getNewTokens(userId: string): Promise<TokenData[]> {
     try {
-      console.log('[DEBUG] Fetching new tokens from Moralis...');
+      console.log('\n[DEBUG] ==== Fetching New Tokens ====');
+      console.log(`[DEBUG] Fetching tokens for user ${userId}`);
+      const currentTime = Date.now();
+      console.log(`[DEBUG] Current time: ${new Date(currentTime).toISOString()}`);
+      console.log(`[DEBUG] Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+      
       const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
         headers: {
           'X-API-Key': config.moralis.apiKey,
           'Accept': 'application/json'
         },
         params: {
-          limit: config.moralis.tokenFetchLimit
+          limit: config.moralis.tokenFetchLimit || 100
         },
         timeout: 30000
       });
 
-      const currentTime = Date.now();
-      console.log(`[DEBUG] Last checked: ${this.lastCheckedTimestamp}, Current: ${currentTime}`);
-      console.log('[DEBUG] Moralis API Response:', JSON.stringify(response.data, null, 2));
+      console.log(`[DEBUG] API Response status: ${response.status}`);
+      console.log(`[DEBUG] API Response headers:`, response.headers);
+      console.log('[DEBUG] API Response data structure:', {
+        isArray: Array.isArray(response.data),
+        hasData: response.data?.data !== undefined,
+        hasResult: response.data?.result !== undefined,
+        type: typeof response.data
+      });
 
       // Handle various response formats
       const tokens = Array.isArray(response.data) ? response.data : 
@@ -40,83 +51,116 @@ export class PumpFunService {
                     response.data.result ? response.data.result : [];
 
       if (!Array.isArray(tokens)) {
-        console.error('[DEBUG] Invalid response format from Moralis API:', response.data);
+        console.error('[DEBUG] Invalid response format from API:', response.data);
         return [];
       }
 
-      console.log(`[DEBUG] Found ${tokens.length} tokens from Moralis`);
+      console.log(`[DEBUG] Found ${tokens.length} total tokens from API`);
 
       // Initialize user's seen tokens set if not exists
       if (!this.lastSeenTokens.has(userId)) {
         this.lastSeenTokens.set(userId, new Set());
+        console.log(`[DEBUG] Initialized new seen tokens set for user ${userId}`);
       }
 
       const seen = this.lastSeenTokens.get(userId)!;
+      console.log(`[DEBUG] Current seen tokens count for user ${userId}: ${seen.size}`);
       const newTokens: TokenData[] = [];
 
       for (const token of tokens) {
-        if (!token?.tokenAddress) {
+        const tokenAddress = token.tokenAddress || token.address;
+        if (!tokenAddress) {
           console.log('[DEBUG] Skipping token without address');
           continue;
         }
 
-        // Skip already seen tokens, but with a time limit
-        const tokenAge = currentTime - this.lastCheckedTimestamp;
-        if (seen.has(token.tokenAddress) && tokenAge < 3600000) { // 1 hour
-          console.log(`[DEBUG] Skipping recently seen token: ${token.tokenAddress}`);
+        // Log token timestamps for debugging
+        const tokenTimestamp = token.timestamp || token.createdAt;
+        if (tokenTimestamp) {
+          console.log(`[DEBUG] Token ${tokenAddress} timestamp: ${new Date(tokenTimestamp).toISOString()}`);
+          console.log(`[DEBUG] Is token new? ${tokenTimestamp > this.lastCheckedTimestamp}`);
+        }
+
+        // Skip recently seen tokens
+        if (seen.has(tokenAddress)) {
+          console.log(`[DEBUG] Skipping previously seen token: ${tokenAddress}`);
           continue;
         }
 
         // Add to seen set
-        seen.add(token.tokenAddress);
+        seen.add(tokenAddress);
+        console.log(`[DEBUG] Added ${tokenAddress} to seen tokens`);
 
         try {
           // Parse numeric values with validation
           const priceUsd = parseFloat(token.priceUsd || '0');
           const liquidity = parseFloat(token.liquidity || '0');
           const fdv = token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                     (priceUsd && liquidity ? priceUsd * liquidity : 0);
+                     (priceUsd && liquidity ? priceUsd * liquidity : liquidity * 2); // Estimate as 2x liquidity
+
+          console.log(`[DEBUG] Parsed token values:`, {
+            priceUsd,
+            liquidity,
+            fdv
+          });
 
           // Create token data with fallbacks
           const tokenData: TokenData = {
-            address: token.tokenAddress,
+            address: tokenAddress,
             name: token.name || 'Unknown',
             symbol: token.symbol || 'Unknown',
             priceUsd: priceUsd.toString(),
-            marketCap: fdv || liquidity * 2, // Estimate marketCap as 2x liquidity if FDV not available
+            marketCap: fdv,
             liquidity: liquidity,
-            fdv: fdv || liquidity * 2,
-            holdersCount: 0,
-            tradingEnabled: true,
-            contractAge: 0,
-            devTokensPercentage: 0
+            fdv: fdv,
+            holdersCount: parseInt(token.holdersCount || '0'),
+            tradingEnabled: token.tradingEnabled !== false, // Default to true unless explicitly false
+            contractAge: tokenTimestamp ? this.calculateContractAge(tokenTimestamp) : 0,
+            devTokensPercentage: parseFloat(token.devTokensPercentage || '0')
           };
+
+          // Log complete token data
+          console.log(`[DEBUG] Processed token data:`, tokenData);
 
           // Add token if it has minimum required data
           if (tokenData.liquidity > 0) {
-            console.log(`[DEBUG] Adding new token: ${tokenData.address} (${tokenData.name})`);
+            console.log(`[DEBUG] Adding new valid token: ${tokenData.address}`);
             newTokens.push(tokenData);
           } else {
             console.log(`[DEBUG] Skipping token with no liquidity: ${tokenData.address}`);
           }
         } catch (error) {
-          console.error(`[DEBUG] Error processing token ${token.tokenAddress}:`, error);
+          console.error(`[DEBUG] Error processing token ${tokenAddress}:`, error);
           continue;
         }
       }
 
       // Update last checked timestamp
+      console.log(`[DEBUG] Updating lastCheckedTimestamp from ${new Date(this.lastCheckedTimestamp).toISOString()} to ${new Date(currentTime).toISOString()}`);
       this.lastCheckedTimestamp = currentTime;
 
-      // Cleanup old seen tokens after 24 hours
-      if (currentTime - this.lastCheckedTimestamp > 86400000) { // 24 hours
+      // Cleanup old seen tokens after a shorter period (1 hour)
+      const oldestAllowedTimestamp = currentTime - 3600000; // 1 hour
+      if (this.lastCheckedTimestamp < oldestAllowedTimestamp) {
+        console.log('[DEBUG] Clearing old seen tokens cache');
         this.lastSeenTokens.set(userId, new Set());
       }
 
       console.log(`[DEBUG] Returning ${newTokens.length} new tokens`);
       return newTokens;
     } catch (error) {
-      console.error('[DEBUG] Error in getNewTokens:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          console.error('[DEBUG] Rate limit hit:', error.response.data);
+        } else {
+          console.error('[DEBUG] API Error:', {
+            status: error.response?.status,
+            data: error.response?.data
+          });
+        }
+      } else {
+        console.error('[DEBUG] Error in getNewTokens:', error);
+      }
       throw error;
     }
   }
