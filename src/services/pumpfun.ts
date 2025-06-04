@@ -39,11 +39,22 @@ export class PumpFunService {
         timeout: 30000
       });
 
+      // Log raw response
+      console.log('[DEBUG] Raw API response:', {
+        status: response.status,
+        hasData: !!response.data,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+        firstItem: response.data?.[0] || response.data?.data?.[0] || response.data?.result?.[0]
+      });
+
       // Initialize user's seen tokens set if not exists
       if (!this.lastSeenTokens.has(userId)) {
         this.lastSeenTokens.set(userId, new Set());
+        console.log(`[DEBUG] Initialized new seen tokens set for user ${userId}`);
       }
       const seen = this.lastSeenTokens.get(userId)!;
+      console.log(`[DEBUG] Current seen tokens for user ${userId}: ${seen.size}`);
       
       // Handle various response formats
       const tokens = Array.isArray(response.data) ? response.data : 
@@ -65,10 +76,20 @@ export class PumpFunService {
           continue;
         }
 
+        // Get token timestamp and convert to milliseconds if needed
+        let tokenTimestamp = token.timestamp || token.createdAt;
+        if (typeof tokenTimestamp === 'string') {
+          tokenTimestamp = new Date(tokenTimestamp).getTime();
+        } else if (tokenTimestamp && tokenTimestamp < 1000000000000) {
+          // If timestamp is in seconds, convert to milliseconds
+          tokenTimestamp = tokenTimestamp * 1000;
+        }
+
+        console.log(`[DEBUG] Token ${tokenAddress} timestamp: ${new Date(tokenTimestamp).toISOString()}, Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+
         // Skip tokens that are too old
-        const tokenTimestamp = token.timestamp || token.createdAt;
         if (!tokenTimestamp || tokenTimestamp <= this.lastCheckedTimestamp) {
-          console.log(`[DEBUG] Skipping old token: ${tokenAddress}`);
+          console.log(`[DEBUG] Skipping old token ${tokenAddress}: ${tokenTimestamp} <= ${this.lastCheckedTimestamp}`);
           continue;
         }
 
@@ -111,15 +132,30 @@ export class PumpFunService {
         }
       }
 
-      // Only update timestamp if we successfully processed the response
-      this.lastCheckedTimestamp = currentTime;
-      
+      // Log before updating timestamp
+      console.log(`[DEBUG] Processing summary:`);
+      console.log(`- Total tokens from API: ${tokens.length}`);
+      console.log(`- New valid tokens found: ${newTokens.length}`);
+      console.log(`- Previously seen tokens: ${seen.size}`);
+      console.log(`- Old timestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+      console.log(`- New timestamp: ${new Date(currentTime).toISOString()}`);
+
       // Cleanup old seen tokens (older than 1 hour)
       if (currentTime - this.lastCheckedTimestamp > 3600000) {
+        console.log('[DEBUG] Clearing seen tokens cache (older than 1 hour)');
         this.lastSeenTokens.clear();
       }
 
-      console.log(`[DEBUG] Found ${newTokens.length} new valid tokens`);
+      // Only update timestamp if we found some tokens, otherwise use a smaller increment
+      if (tokens.length > 0) {
+        this.lastCheckedTimestamp = currentTime;
+      } else {
+        // If no tokens found, only move timestamp forward by 30 seconds to avoid missing tokens
+        this.lastCheckedTimestamp = Math.min(currentTime, this.lastCheckedTimestamp + 30000);
+      }
+
+      console.log(`[DEBUG] Updated lastCheckedTimestamp to: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+      console.log(`[DEBUG] Returning ${newTokens.length} new valid tokens`);
       return newTokens;
     } catch (error) {
       console.error('[DEBUG] Error in getNewTokens:', error);
