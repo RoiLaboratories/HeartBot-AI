@@ -1503,8 +1503,6 @@ export class TelegramService {
     if (!telegramId) return;
 
     try {
-      await ctx.reply('🔍 Fetching token alerts...');
-
       // Get user's active filters
       const { data: filters, error } = await this.adminClient
         .from('Filter')
@@ -1513,6 +1511,7 @@ export class TelegramService {
         .eq('is_active', true);
 
       if (error) {
+        console.error('[DEBUG] Error fetching filters:', error);
         await ctx.reply('❌ Error fetching filters');
         return;
       }
@@ -1522,228 +1521,82 @@ export class TelegramService {
         return;
       }
 
-      // Add retry logic for Moralis API
-      let retryCount = 0;
-      const maxRetries = 3;
-      const baseDelay = 2000;
-      let tokens = [];
-
-      while (retryCount < maxRetries) {
-        try {
-          // Get latest tokens directly from Moralis
-          const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
-            headers: {
-              'X-API-Key': config.moralis.apiKey,
-              'Accept': 'application/json'
-            },
-            params: {
-              limit: config.moralis.tokenFetchLimit
-            },
-            timeout: 10000 // 10 second timeout
-          });
-
-          console.log('Fetch limit from .env:', process.env.MORALIS_TOKEN_FETCH_LIMIT);
-          console.log('[DEBUG] Moralis API Response Status:', response.status);
-          console.log('[DEBUG] Response type:', typeof response.data);
-          console.log('[DEBUG] Is Array?', Array.isArray(response.data));
-
-          if (!response.data) {
-            throw new Error('Empty response from Moralis API');
-          }
-
-          // Handle both array and object with data property
-          tokens = Array.isArray(response.data) ? response.data : 
-                  response.data.data ? response.data.data :
-                  response.data.result ? response.data.result : [];
-
-          if (!Array.isArray(tokens)) {
-            throw new Error('Invalid response format from Moralis API');
-          }
-
-          // If we get here, the request was successful
-          break;
-        } catch (error: any) {
-          retryCount++;
-          
-          if (error.response?.status === 429) {
-            // Rate limit hit, wait for the specified time plus some buffer
-            const retryAfter = (error.response.headers['retry-after'] || 1) * 1000;
-            console.log(`[DEBUG] Rate limit hit, waiting ${retryAfter}ms before retry ${retryCount}/${maxRetries}`);
-            await new Promise(resolve => setTimeout(resolve, retryAfter + 1000)); // Add 1 second buffer
-            continue;
-          }
-          
-          if (error.response?.status === 500) {
-            console.error('[DEBUG] Moralis API server error:', error.response.data);
-            await ctx.reply('⚠️ Moralis API is currently experiencing issues. Please try again in a few minutes.');
-            return;
-          }
-          
-          if (retryCount === maxRetries) {
-            console.error('[DEBUG] Failed to fetch tokens after', maxRetries, 'attempts:', error);
-            if (error.response) {
-              await ctx.reply(`❌ Error fetching tokens: ${error.response.status} - ${error.response.statusText}\n\nPlease try again later.`);
-            } else if (error.code === 'ECONNABORTED') {
-              await ctx.reply('❌ Request timed out. Please try again later.');
-            } else {
-              await ctx.reply('❌ Error fetching tokens. Please try again later.');
-            }
-            return;
-          }
-          
-          // For other errors, use exponential backoff
-          const delay = baseDelay * Math.pow(2, retryCount - 1);
-          console.log(`[DEBUG] Error fetching tokens, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-
-      // Filter out invalid tokens
-      const validTokens = tokens.filter((token: { tokenAddress?: string }) => token && token.tokenAddress);
+      // Enable monitoring for this user
+      this.heartBot.enableMonitoring(telegramId);
       
-      if (validTokens.length === 0) {
-        await ctx.reply('❌ No valid tokens found in the response');
-        return;
+      // Start monitoring and send confirmation
+      await ctx.reply('✅ Token monitoring started! You will receive alerts when new tokens match your filters.\n\nUse /stop to disable monitoring.');
+
+      // Optionally check current filters
+      const filterDescriptions = filters.map((filter, index) => {
+        const parts = [];
+        if (filter.min_market_cap) parts.push(`Min MC: $${filter.min_market_cap}`);
+        if (filter.max_market_cap) parts.push(`Max MC: $${filter.max_market_cap}`);
+        if (filter.min_liquidity) parts.push(`Min Liq: $${filter.min_liquidity}`);
+        if (filter.max_liquidity) parts.push(`Max Liq: $${filter.max_liquidity}`);
+        return `Filter ${index + 1}:\n${parts.join('\n')}`;
+      });
+
+      if (filterDescriptions.length > 0) {
+        await ctx.reply('Your active filters:\n\n' + filterDescriptions.join('\n\n'));
       }
 
-      await ctx.reply(`Found ${validTokens.length} valid tokens from Moralis. Checking against your filters...`);
-
-      let matchedTokens = 0;
-
-      for (const token of validTokens) {
-        console.log(`Processing token: ${token.tokenAddress}`);
-        try {
-          const finalTokenData = {
-            address: token.tokenAddress,
-            name: token.name || 'Unknown',
-            symbol: token.symbol || 'Unknown',
-            priceUsd: token.priceUsd,
-            marketCap: token.marketCap,
-            liquidity: token.liquidity,
-            fdv: token.fdv,
-            holdersCount: 0, // Not available from Moralis
-            tradingEnabled: true, // Assume trading is enabled for new tokens
-            contractAge: 0, // Not available from Moralis
-            devTokensPercentage: 0 // Not available from Moralis
-          };
-
-          // Calculate marketCap if not provided
-          if (!finalTokenData.marketCap && finalTokenData.priceUsd && finalTokenData.liquidity) {
-            // Estimate marketCap as 2x liquidity for new tokens
-            finalTokenData.marketCap = finalTokenData.liquidity * 2;
-            console.log(`[DEBUG] Calculated marketCap for ${token.tokenAddress}: ${finalTokenData.marketCap}`);
-          }
-
-          // Validate token data
-          if (!finalTokenData.liquidity) {
-            console.log(`Invalid token data for ${token.tokenAddress}:`, finalTokenData);
-            continue;
-          }
-
-          if (!finalTokenData.marketCap) {
-            console.log(`Invalid token data for ${token.tokenAddress}:`, finalTokenData);
-            continue;
-          }
-
-          for (const filter of filters) {
-            // Skip filters that require Dexscreener data
-            if (filter.min_holders || filter.max_holders || 
-                filter.max_dev_tokens || filter.min_contract_age) {
-              console.log(`Skipping filter for ${token.tokenAddress} - requires Dexscreener data`);
-              continue;
-            }
-
-            const matches = this.matchesFilter(finalTokenData, filter);
-            if (matches) {
-              matchedTokens++;
-              await this.sendTokenAlert(telegramId, finalTokenData);
-              await ctx.reply(`✅ Sent alert for token ${token.tokenAddress}`);
-            }
-          }
-        } catch (error) {
-          console.error(`Error processing token ${token.tokenAddress}:`, error);
-          continue;
-        }
-      }
-
-      if (matchedTokens === 0) {
-        await ctx.reply('❌ No tokens matched your filters');
-      } else {
-        await ctx.reply(`✅ Sent ${matchedTokens} token alerts`);
-      }
-    } catch (error: any) {
-      if (error.code === 'ECONNABORTED') {
-        await ctx.reply('❌ Moralis API request timed out. Please try again.');
-      } else if (error.response) {
-        await ctx.reply(`❌ Moralis API error: ${error.response.status} - ${error.response.statusText}`);
-      } else {
-        await ctx.reply('❌ Error testing token alerts: ' + error.message);
-      }
-      console.error('Error in test command:', error);
+    } catch (error) {
+      console.error('[DEBUG] Error in handleFetch:', error);
+      await ctx.reply('❌ Error starting token monitoring. Please try again.');
     }
   }
 
   private matchesFilter(token: TokenData, filter: any): boolean {
-    console.log(`\nChecking token ${token.address} against filter for user ${filter.user_id}`);
-    console.log('Token data:', {
-      liquidity: token.liquidity,
-      marketCap: token.marketCap,
-      holdersCount: token.holdersCount,
-      devTokensPercentage: token.devTokensPercentage,
-      contractAge: token.contractAge,
-      tradingEnabled: token.tradingEnabled
-    });
+    console.log(`[DEBUG] Checking token ${token.address} against filter:`, filter);
 
-    // Market cap filters
-    if (filter.min_market_cap && token.marketCap < filter.min_market_cap) {
-      console.log(`❌ Market cap ${token.marketCap} < min ${filter.min_market_cap}`);
-      return false;
-    }
-    if (filter.max_market_cap && token.marketCap > filter.max_market_cap) {
-      console.log(`❌ Market cap ${token.marketCap} > max ${filter.max_market_cap}`);
+    // Skip holder checks for now as we don't have that data
+    if (filter.min_holders || filter.max_holders) {
+      console.log('[DEBUG] Skipping holder checks - data not available');
       return false;
     }
 
-    // Liquidity filters
-    if (filter.min_liquidity && token.liquidity < filter.min_liquidity) {
-      console.log(`❌ Liquidity ${token.liquidity} < min ${filter.min_liquidity}`);
+    // Market cap check
+    if (filter.min_market_cap && (!token.marketCap || token.marketCap < filter.min_market_cap)) {
+      console.log(`[DEBUG] Failed min market cap check: ${token.marketCap} < ${filter.min_market_cap}`);
       return false;
     }
-    if (filter.max_liquidity && token.liquidity > filter.max_liquidity) {
-      console.log(`❌ Liquidity ${token.liquidity} > max ${filter.max_liquidity}`);
-      return false;
-    }
-
-    // Holders filters
-    if (filter.min_holders && token.holdersCount < filter.min_holders) {
-      console.log(`❌ Holders ${token.holdersCount} < min ${filter.min_holders}`);
-      return false;
-    }
-    if (filter.max_holders && token.holdersCount > filter.max_holders) {
-      console.log(`❌ Holders ${token.holdersCount} > max ${filter.max_holders}`);
+    if (filter.max_market_cap && (!token.marketCap || token.marketCap > filter.max_market_cap)) {
+      console.log(`[DEBUG] Failed max market cap check: ${token.marketCap} > ${filter.max_market_cap}`);
       return false;
     }
 
-    // Dev tokens filter
-    if (filter.max_dev_tokens && token.devTokensPercentage && token.devTokensPercentage > filter.max_dev_tokens) {
-      console.log(`❌ Dev tokens ${token.devTokensPercentage}% > max ${filter.max_dev_tokens}%`);
+    // Liquidity check
+    if (filter.min_liquidity && (!token.liquidity || token.liquidity < filter.min_liquidity)) {
+      console.log(`[DEBUG] Failed min liquidity check: ${token.liquidity} < ${filter.min_liquidity}`);
+      return false;
+    }
+    if (filter.max_liquidity && (!token.liquidity || token.liquidity > filter.max_liquidity)) {
+      console.log(`[DEBUG] Failed max liquidity check: ${token.liquidity} > ${filter.max_liquidity}`);
       return false;
     }
 
-    // Contract age filter
-    if (filter.min_contract_age && token.contractAge < filter.min_contract_age) {
-      console.log(`❌ Contract age ${token.contractAge} < min ${filter.min_contract_age}`);
+    // Dev tokens check - skip if not available
+    if (filter.max_dev_tokens && token.devTokensPercentage !== undefined) {
+      if (token.devTokensPercentage > filter.max_dev_tokens) {
+        console.log(`[DEBUG] Failed max dev tokens check: ${token.devTokensPercentage} > ${filter.max_dev_tokens}`);
+        return false;
+      }
+    }
+
+    // Contract age check - skip if not available
+    if (filter.min_contract_age && (!token.contractAge || token.contractAge < filter.min_contract_age)) {
+      console.log(`[DEBUG] Failed min contract age check: ${token.contractAge} < ${filter.min_contract_age}`);
       return false;
     }
 
-    // Trading status filter
-    if (filter.trading_enabled !== null && token.tradingEnabled !== filter.trading_enabled) {
-      console.log(`❌ Trading status ${token.tradingEnabled} != required ${filter.trading_enabled}`);
+    // Trading status check
+    if (filter.trading_status !== undefined && token.tradingEnabled !== filter.trading_status) {
+      console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_status}`);
       return false;
     }
 
-    // If we get here, the token matches all specified filters
-    console.log(`✅ Token ${token.address} matches all filters for user ${filter.user_id}`);
+    console.log(`[DEBUG] Token ${token.address} matches all filter criteria`);
     return true;
   }
 
@@ -1810,4 +1663,4 @@ export class TelegramService {
   public async getWebhookInfo() {
     return await this.bot.telegram.getWebhookInfo();
   }
-} 
+}
