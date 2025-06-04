@@ -1547,7 +1547,7 @@ export class TelegramService {
     }
   }
 
-  private matchesFilter(token: TokenData, filter: any): boolean {
+  public matchesFilter(token: TokenData, filter: any): boolean {
     console.log(`[DEBUG] Checking token ${token.address} against filter:`, filter);
 
     // Skip holder checks for now as we don't have that data
@@ -1591,8 +1591,8 @@ export class TelegramService {
     }
 
     // Trading status check
-    if (filter.trading_status !== undefined && token.tradingEnabled !== filter.trading_status) {
-      console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_status}`);
+    if (filter.trading_enabled !== undefined && token.tradingEnabled !== filter.trading_enabled) {
+      console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_enabled}`);
       return false;
     }
 

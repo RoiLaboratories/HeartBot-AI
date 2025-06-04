@@ -18,48 +18,75 @@ export class HeartBot {
   public monitoringIntervalId: NodeJS.Timeout | undefined;
 
   public startMonitoringLoop() {
-  if (this.monitoringIntervalId) return; // already running
+    if (this.monitoringIntervalId) return; // already running
 
-  console.log('[HeartBot] Starting monitoring loop...');
-  this.isRunning = true;
+    console.log('[HeartBot] Starting monitoring loop...');
+    this.isRunning = true;
 
-  this.monitoringIntervalId = setInterval(async () => {
-    for (const [userId, enabled] of this.monitoringEnabled.entries()) {
-      if (!enabled) continue;
-
-      console.log(`[DEBUG] Monitoring loop cycle running at ${new Date().toISOString()}`);
-      console.log(`[HeartBot] Scanning for new tokens for user ${userId}`);
-      try {
-        const tokens = await this.pumpFun.getNewTokens(userId); // implement this method in PumpFunService
-
-        if (tokens.length === 0) {
-          console.log(`[HeartBot] No tokens matched for user ${userId}`);
+    this.monitoringIntervalId = setInterval(async () => {
+      for (const [userId, enabled] of this.monitoringEnabled.entries()) {
+        if (!enabled) {
+          console.log(`[DEBUG] Monitoring disabled for user ${userId}, skipping`);
           continue;
         }
 
-        // Debug logging for sample token data
-        if (tokens.length > 0) {
-          console.log('[DEBUG] Sample token data:', {
-            name: tokens[0].name,
-            marketCap: tokens[0].marketCap,
-            liquidity: tokens[0].liquidity,
-            address: tokens[0].address
-          });
-        }
-
-        for (const token of tokens) {
-          
-          await this.telegram.sendTokenAlert(userId, token);
-        }
-
-      } catch (error) {
-        console.error(`[HeartBot] Error during scan for user ${userId}:`, error);
+        console.log(`[DEBUG] Monitoring loop cycle running at ${new Date().toISOString()}`);
+        console.log(`[HeartBot] Scanning for new tokens for user ${userId}`);
         
-        
+        try {
+          // Get user's active filters first
+          const { data: filters, error } = await this.adminClient
+            .from('Filter')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('is_active', true);
+
+          if (error) {
+            console.error(`[DEBUG] Error fetching filters for user ${userId}:`, error);
+            continue;
+          }
+
+          if (!filters || filters.length === 0) {
+            console.log(`[DEBUG] No active filters found for user ${userId}`);
+            continue;
+          }
+
+          // Fetch new tokens
+          const tokens = await this.pumpFun.getNewTokens(userId);
+
+          if (tokens.length === 0) {
+            console.log(`[DEBUG] No new tokens found for user ${userId}`);
+            continue;
+          }
+
+          console.log(`[DEBUG] Found ${tokens.length} new tokens, checking against ${filters.length} filters`);
+
+          // Check each token against each filter
+          for (const token of tokens) {
+            let matched = false;
+            
+            for (const filter of filters) {
+              if (this.telegram.matchesFilter(token, filter)) {
+                console.log(`[DEBUG] Token ${token.address} matched filter for user ${userId}`);
+                await this.telegram.sendTokenAlert(userId, token);
+                matched = true;
+                break; // Skip remaining filters once we have a match
+              }
+            }
+
+            if (!matched) {
+              console.log(`[DEBUG] Token ${token.address} did not match any filters for user ${userId}`);
+            }
+          }
+
+        } catch (error) {
+          console.error(`[HeartBot] Error during scan for user ${userId}:`, error);
+        }
       }
-    }
-  }, 60 * 1000); // every 60 seconds
-}
+    }, 60 * 1000); // every 60 seconds
+
+    console.log('[DEBUG] Monitoring loop started successfully');
+  }
 
 
   // public getMonitoringIntervalId(): NodeJS.Timeout | undefined {
@@ -563,4 +590,4 @@ export default async function handler(req: any, res: any) {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-} 
+}
