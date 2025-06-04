@@ -1549,7 +1549,7 @@ export class TelegramService {
         if (filter.max_market_cap) parts.push(`Max MC: $${filter.max_market_cap}`);
         if (filter.min_liquidity) parts.push(`Min Liq: $${filter.min_liquidity}`);
         if (filter.max_liquidity) parts.push(`Max Liq: $${filter.max_liquidity}`);
-        if (filter.trading_enabled) parts.push(`Trading Status: $${filter.trading_enabled}`);
+        if (filter.trading_enabled) parts.push(`Trading Status: {filter.trading_enabled}`);
         return `Filter ${index + 1}:\n${parts.join('\n')}`;
       });
 
