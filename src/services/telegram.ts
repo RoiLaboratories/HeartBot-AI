@@ -1532,8 +1532,6 @@ export class TelegramService {
         return;
       }
 
-      console.log(`[DEBUG] Found ${filters.length} active filters for user ${telegramId}`);
-
       // Enable monitoring for this user
       console.log(`[DEBUG] Enabling monitoring for user ${telegramId}`);
       this.heartBot.enableMonitoring(telegramId);
@@ -1549,7 +1547,7 @@ export class TelegramService {
         if (filter.max_market_cap) parts.push(`Max MC: $${filter.max_market_cap}`);
         if (filter.min_liquidity) parts.push(`Min Liq: $${filter.min_liquidity}`);
         if (filter.max_liquidity) parts.push(`Max Liq: $${filter.max_liquidity}`);
-        if (filter.trading_enabled) parts.push(`Trading Status: ${filter.trading_enabled}`);
+        if (filter.trading_enabled !== undefined) parts.push(`Trading Status: ${filter.trading_enabled ? 'Enabled' : 'Disabled'}`);
         return `Filter ${index + 1}:\n${parts.join('\n')}`;
       });
 
@@ -1557,7 +1555,7 @@ export class TelegramService {
       const message = '✅ Token monitoring started!\n\n' +
                      'Your active filters:\n\n' +
                      filterDescriptions.join('\n\n') +
-                     '\n\nYou will receive alerts when new tokens match these criteria.\n' +
+                     '\n\nYou will receive alerts every 30 seconds when new tokens match these criteria.\n' +
                      'Use /stop to disable monitoring.';
       
       await ctx.reply(message, { parse_mode: 'HTML' });

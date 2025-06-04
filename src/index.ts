@@ -19,14 +19,14 @@ export class HeartBot {
 
   public startMonitoringLoop() {
     if (this.monitoringIntervalId) {
-      console.log('[DEBUG] Monitoring loop already running, clearing existing interval');
-      clearInterval(this.monitoringIntervalId);
+      console.log('[DEBUG] Monitoring loop already running, skipping start');
+      return;
     }
 
     console.log('[HeartBot] Starting monitoring loop...');
     this.isRunning = true;
     
-    // Reset last checked timestamp to start from 15 minutes ago
+    // Reset last checked timestamp to start fresh
     this.pumpFun.resetLastCheckedTimestamp();
     console.log('[DEBUG] Reset last checked timestamp');
 
@@ -47,9 +47,6 @@ export class HeartBot {
         const activeUsers = Array.from(this.monitoringEnabled.entries())
           .filter(([_, enabled]) => enabled)
           .map(([userId, _]) => userId);
-
-        console.log(`[DEBUG] Active users: ${JSON.stringify(activeUsers)}`);
-        console.log(`[DEBUG] Monitoring status map:`, Object.fromEntries(this.monitoringEnabled));
 
         if (activeUsers.length === 0) {
           console.log('[DEBUG] No active users, skipping cycle');
@@ -126,6 +123,7 @@ export class HeartBot {
                 console.log(`[DEBUG] Token ${token.address} did not match any filters for user ${userId}`);
               }
             }
+
             console.log(`[DEBUG] Sent ${alertsSent} alerts for user ${userId} in this cycle`);
 
           } catch (error) {
@@ -140,7 +138,7 @@ export class HeartBot {
       } finally {
         isProcessing = false;
       }
-    }, 60 * 1000); // Check every 60 seconds
+    }, 30 * 1000); // Check every 30 seconds
 
     console.log('[DEBUG] Monitoring loop started successfully');
   }
@@ -220,10 +218,8 @@ export class HeartBot {
           // Set running state after successful start
           this.isRunning = true;
           
-          // Start token monitoring in the background
-          console.log('[DEBUG] Starting token monitoring...');
-          this.startMonitoringLoop();
-          console.log('[DEBUG] Token monitoring started');
+          // Don't start token monitoring yet - it will start when users request it
+          console.log('[DEBUG] Bot ready to monitor tokens when requested');
         } catch (error: any) {
           if (error.response?.error_code === 429) {
             console.log('[DEBUG] Rate limit hit while starting bot, will retry on next request');
@@ -590,48 +586,13 @@ export class HeartBot {
     this.monitoringEnabled.set(userId, true);
     console.log(`[DEBUG] Current monitoring state:`, Array.from(this.monitoringEnabled.entries()));
     
-    // Always restart monitoring loop to ensure fresh state
-    console.log('[DEBUG] Starting fresh monitoring loop...');
-    this.startMonitoringLoop();
-    
-    // Immediately trigger a token check for this user
-    setTimeout(async () => {
-      try {
-        console.log(`[DEBUG] Running immediate token check for user ${userId}`);
-        // Get user's active filters
-        const { data: filters, error } = await this.adminClient
-          .from('Filter')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('is_active', true);
-
-        if (error) {
-          console.error(`[DEBUG] Error fetching filters for immediate check:`, error);
-          return;
-        }
-
-        if (!filters || filters.length === 0) {
-          console.log(`[DEBUG] No active filters found for immediate check`);
-          return;
-        }
-
-        const tokens = await this.pumpFun.getNewTokens(userId);
-        console.log(`[DEBUG] Found ${tokens.length} tokens in immediate check`);
-        
-        // Process tokens immediately
-        for (const token of tokens) {
-          for (const filter of filters) {
-            if (this.telegram.matchesFilter(token, filter)) {
-              console.log(`[DEBUG] Token ${token.address} matched filter in immediate check`);
-              await this.telegram.sendTokenAlert(userId, token);
-              break;
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`[DEBUG] Error in immediate token check:`, error);
-      }
-    }, 1000); // Run check after 1 second
+    // Start monitoring loop if it's not running
+    if (!this.monitoringIntervalId) {
+      console.log('[DEBUG] Starting monitoring loop...');
+      this.startMonitoringLoop();
+    } else {
+      console.log('[DEBUG] Monitoring loop already running');
+    }
   }
 
   disableMonitoring(userId: string) {
