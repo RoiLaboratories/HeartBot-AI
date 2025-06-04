@@ -8,7 +8,10 @@ export class PumpFunService {
   private lastCheckedTimestamp: number = 0;
   private lastSeenTokens: Map<string, Set<string>> = new Map();
 
-  constructor() {}
+  constructor() {
+    // Initialize timestamp to 15 minutes ago to fetch recent tokens
+    this.resetLastCheckedTimestamp();
+  }
 
   resetLastCheckedTimestamp() {
     console.log('[DEBUG] Resetting last checked timestamp and clearing token cache');
@@ -36,61 +39,25 @@ export class PumpFunService {
         timeout: 30000
       });
 
-      console.log(`[DEBUG] API Response status: ${response.status}`);
-      if (response.status !== 200) {
-        console.error(`[DEBUG] Unexpected API response status: ${response.status}`);
-        return [];
+      // Initialize user's seen tokens set if not exists
+      if (!this.lastSeenTokens.has(userId)) {
+        this.lastSeenTokens.set(userId, new Set());
       }
-
-      if (!response.data) {
-        console.error('[DEBUG] Empty API response data');
-        return [];
-      }
-
-      // Log response structure
-      console.log('[DEBUG] API Response structure:', {
-        type: typeof response.data,
-        isArray: Array.isArray(response.data),
-        hasData: Boolean(response.data?.data),
-        hasResult: Boolean(response.data?.result),
-        keys: Object.keys(response.data)
-      });
-
+      const seen = this.lastSeenTokens.get(userId)!;
+      
       // Handle various response formats
       const tokens = Array.isArray(response.data) ? response.data : 
-                    response.data.data ? response.data.data :
-                    response.data.result ? response.data.result : [];
+                    response.data?.data ? response.data.data :
+                    response.data?.result ? response.data.result : [];
 
-      if (!Array.isArray(tokens)) {
-        console.error('[DEBUG] Invalid response format from API:', response.data);
-        return [];
-      }
-
-      console.log(`[DEBUG] Found ${tokens.length} total tokens from API`);
-      if (tokens.length === 0) {
+      if (!Array.isArray(tokens) || tokens.length === 0) {
         console.log('[DEBUG] No tokens returned from API');
         return [];
       }
 
-      // Sample the first token for debugging
-      if (tokens.length > 0) {
-        console.log('[DEBUG] First token from API:', {
-          address: tokens[0].address || tokens[0].tokenAddress,
-          name: tokens[0].name,
-          timestamp: tokens[0].timestamp || tokens[0].createdAt
-        });
-      }
-
-      // Initialize user's seen tokens set if not exists
-      if (!this.lastSeenTokens.has(userId)) {
-        this.lastSeenTokens.set(userId, new Set());
-        console.log(`[DEBUG] Initialized new seen tokens set for user ${userId}`);
-      }
-
-      const seen = this.lastSeenTokens.get(userId)!;
-      console.log(`[DEBUG] Current seen tokens count for user ${userId}: ${seen.size}`);
+      console.log(`[DEBUG] Found ${tokens.length} total tokens from API`);
+      
       const newTokens: TokenData[] = [];
-
       for (const token of tokens) {
         const tokenAddress = token.tokenAddress || token.address;
         if (!tokenAddress) {
@@ -98,37 +65,27 @@ export class PumpFunService {
           continue;
         }
 
-        // Log token timestamps for debugging
+        // Skip tokens that are too old
         const tokenTimestamp = token.timestamp || token.createdAt;
-        if (tokenTimestamp) {
-          console.log(`[DEBUG] Token ${tokenAddress} timestamp: ${new Date(tokenTimestamp).toISOString()}`);
-          console.log(`[DEBUG] Is token new? ${tokenTimestamp > this.lastCheckedTimestamp}`);
+        if (!tokenTimestamp || tokenTimestamp <= this.lastCheckedTimestamp) {
+          console.log(`[DEBUG] Skipping old token: ${tokenAddress}`);
+          continue;
         }
 
-        // Skip recently seen tokens
+        // Skip previously seen tokens
         if (seen.has(tokenAddress)) {
           console.log(`[DEBUG] Skipping previously seen token: ${tokenAddress}`);
           continue;
         }
-
-        // Add to seen set
-        seen.add(tokenAddress);
-        console.log(`[DEBUG] Added ${tokenAddress} to seen tokens`);
 
         try {
           // Parse numeric values with validation
           const priceUsd = parseFloat(token.priceUsd || '0');
           const liquidity = parseFloat(token.liquidity || '0');
           const fdv = token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                     (priceUsd && liquidity ? priceUsd * liquidity : liquidity * 2); // Estimate as 2x liquidity
+                     (priceUsd && liquidity ? priceUsd * liquidity : liquidity * 2);
 
-          console.log(`[DEBUG] Parsed token values:`, {
-            priceUsd,
-            liquidity,
-            fdv
-          });
-
-          // Create token data with fallbacks
+          // Create token data
           const tokenData: TokenData = {
             address: tokenAddress,
             name: token.name || 'Unknown',
@@ -138,54 +95,35 @@ export class PumpFunService {
             liquidity: liquidity,
             fdv: fdv,
             holdersCount: parseInt(token.holdersCount || '0'),
-            tradingEnabled: token.tradingEnabled !== false, // Default to true unless explicitly false
+            tradingEnabled: token.tradingEnabled !== false,
             contractAge: tokenTimestamp ? this.calculateContractAge(tokenTimestamp) : 0,
             devTokensPercentage: parseFloat(token.devTokensPercentage || '0')
           };
 
-          // Log complete token data
-          console.log(`[DEBUG] Processed token data:`, tokenData);
-
-          // Add token if it has minimum required data
+          // Only add token if it has liquidity
           if (tokenData.liquidity > 0) {
-            console.log(`[DEBUG] Adding new valid token: ${tokenData.address}`);
+            console.log(`[DEBUG] Adding new token: ${tokenData.address}`);
+            seen.add(tokenAddress);
             newTokens.push(tokenData);
-          } else {
-            console.log(`[DEBUG] Skipping token with no liquidity: ${tokenData.address}`);
           }
         } catch (error) {
           console.error(`[DEBUG] Error processing token ${tokenAddress}:`, error);
-          continue;
         }
       }
 
-      // Update last checked timestamp
-      console.log(`[DEBUG] Updating lastCheckedTimestamp from ${new Date(this.lastCheckedTimestamp).toISOString()} to ${new Date(currentTime).toISOString()}`);
+      // Only update timestamp if we successfully processed the response
       this.lastCheckedTimestamp = currentTime;
-
-      // Cleanup old seen tokens after a shorter period (1 hour)
-      const oldestAllowedTimestamp = currentTime - 3600000; // 1 hour
-      if (this.lastCheckedTimestamp < oldestAllowedTimestamp) {
-        console.log('[DEBUG] Clearing old seen tokens cache');
-        this.lastSeenTokens.set(userId, new Set());
+      
+      // Cleanup old seen tokens (older than 1 hour)
+      if (currentTime - this.lastCheckedTimestamp > 3600000) {
+        this.lastSeenTokens.clear();
       }
 
-      console.log(`[DEBUG] Returning ${newTokens.length} new tokens`);
+      console.log(`[DEBUG] Found ${newTokens.length} new valid tokens`);
       return newTokens;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 429) {
-          console.error('[DEBUG] Rate limit hit:', error.response.data);
-        } else {
-          console.error('[DEBUG] API Error:', {
-            status: error.response?.status,
-            data: error.response?.data
-          });
-        }
-      } else {
-        console.error('[DEBUG] Error in getNewTokens:', error);
-      }
-      throw error;
+      console.error('[DEBUG] Error in getNewTokens:', error);
+      return []; // Return empty array on error to continue operation
     }
   }
 
