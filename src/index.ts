@@ -18,10 +18,16 @@ export class HeartBot {
   public monitoringIntervalId: NodeJS.Timeout | undefined;
 
   public startMonitoringLoop() {
-    if (this.monitoringIntervalId) return; // already running
+    if (this.monitoringIntervalId) {
+      console.log('[DEBUG] Monitoring loop already running, skipping start');
+      return;
+    }
 
     console.log('[HeartBot] Starting monitoring loop...');
     this.isRunning = true;
+    
+    // Reset last checked timestamp to ensure we get new tokens
+    this.pumpFun.resetLastCheckedTimestamp();
 
     this.monitoringIntervalId = setInterval(async () => {
       for (const [userId, enabled] of this.monitoringEnabled.entries()) {
@@ -188,8 +194,31 @@ export class HeartBot {
 
     return this.initializationPromise;
   }
-  stop() {
-    throw new Error('Method not implemented.');
+  async stop() {
+    try {
+      console.log('[DEBUG] Stopping HeartBot...');
+      
+      // Stop Telegram bot
+      if (this.telegram) {
+        await this.telegram.stop();
+      }
+      
+      // Stop Fastify server if running
+      if (this.serverStarted) {
+        await this.server.close();
+        this.serverStarted = false;
+      }
+      
+      // Cleanup monitoring
+      this.cleanup();
+      
+      this.isRunning = false;
+      this.initializationPromise = null;
+      console.log('[DEBUG] HeartBot stopped successfully');
+    } catch (error) {
+      console.error('[DEBUG] Error stopping HeartBot:', error);
+      throw error;
+    }
   }
 
   // private startTokenMonitoring() {
@@ -512,12 +541,26 @@ export class HeartBot {
     
     // Ensure monitoring is running
     if (!this.monitoringIntervalId) {
-      console.log('[DEBUG] Monitoring interval not found, restarting monitoring...');
+      console.log('[DEBUG] Monitoring interval not found, starting monitoring loop...');
       this.startMonitoringLoop();
+    } else {
+      console.log('[DEBUG] Monitoring interval already exists');
     }
     
-    // Reset last checked timestamp to ensure we get new tokens
-    this.pumpFun.resetLastCheckedTimestamp();
+    // Immediately trigger a token check for this user
+    setTimeout(async () => {
+      try {
+        console.log(`[DEBUG] Running immediate token check for user ${userId}`);
+        const tokens = await this.pumpFun.getNewTokens(userId);
+        if (tokens.length > 0) {
+          console.log(`[DEBUG] Found ${tokens.length} tokens in immediate check`);
+        } else {
+          console.log(`[DEBUG] No tokens found in immediate check`);
+        }
+      } catch (error) {
+        console.error(`[DEBUG] Error in immediate token check:`, error);
+      }
+    }, 1000); // Run check after 1 second
   }
 
   disableMonitoring(userId: string) {

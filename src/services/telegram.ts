@@ -19,7 +19,6 @@ interface FilterState {
   maxDevTokens?: number;
   minContractAge?: number;
   tradingEnabled?: boolean;
-  tradingStatus?: boolean;
 }
 
 interface Filter {
@@ -1062,7 +1061,7 @@ export class TelegramService {
 
     const state = this.filterStates.get(telegramId);
     if (state) {
-      state.tradingStatus = value === 'true';
+      state.tradingEnabled = value === 'true';
       this.filterStates.set(telegramId, state);
       await this.handleFilterReview(ctx);
     }
@@ -1097,8 +1096,8 @@ export class TelegramService {
       message += `⏰ Min Contract Age: ${state.minContractAge} hours\n`;
     }
     
-    if (state.tradingStatus !== undefined) {
-      message += `🔄 Trading Status: ${state.tradingStatus ? 'Trading' : 'Not Trading'}\n`;
+    if (state.tradingEnabled !== undefined) {
+      message += `🔄 Trading Status: ${state.tradingEnabled ? 'Trading' : 'Not Trading'}\n`;
     }
 
     message += '\nWould you like to save this filter?';
@@ -1147,7 +1146,7 @@ export class TelegramService {
           max_holders: state.maxHolders,
           max_dev_tokens: state.maxDevTokens,
           min_contract_age: state.minContractAge,
-          trading_enabled: state.tradingStatus,
+          trading_enabled: state.tradingEnabled,
           is_active: true
         });
 
@@ -1591,9 +1590,14 @@ export class TelegramService {
     }
 
     // Trading status check
-    if (filter.trading_enabled !== undefined && token.tradingEnabled !== filter.trading_enabled) {
-      console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_enabled}`);
-      return false;
+    if (filter.trading_enabled !== undefined) {
+      console.log(`[DEBUG] Checking trading status - Token: ${token.tradingEnabled}, Filter requires: ${filter.trading_enabled}`);
+      if (token.tradingEnabled !== filter.trading_enabled) {
+        console.log(`[DEBUG] Failed trading status check: Token ${token.tradingEnabled ? 'is' : 'is not'} trading, but filter requires ${filter.trading_enabled ? 'trading' : 'not trading'}`);
+        return false;
+      } else {
+        console.log(`[DEBUG] Passed trading status check`);
+      }
     }
 
     console.log(`[DEBUG] Token ${token.address} matches all filter criteria`);

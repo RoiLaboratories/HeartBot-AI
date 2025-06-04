@@ -11,9 +11,8 @@ export class PumpFunService {
   constructor() {}
 
   resetLastCheckedTimestamp() {
-    console.log('Resetting last checked timestamp...');
-    this.lastCheckedTimestamp = 0;
-    // Also clear the lastSeenTokens cache
+    console.log('[DEBUG] Resetting last checked timestamp and clearing token cache');
+    this.lastCheckedTimestamp = Date.now() - (15 * 60 * 1000); // Start from 15 minutes ago
     this.lastSeenTokens.clear();
   }
 
