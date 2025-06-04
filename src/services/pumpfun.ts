@@ -37,12 +37,23 @@ export class PumpFunService {
       });
 
       console.log(`[DEBUG] API Response status: ${response.status}`);
-      console.log(`[DEBUG] API Response headers:`, response.headers);
-      console.log('[DEBUG] API Response data structure:', {
+      if (response.status !== 200) {
+        console.error(`[DEBUG] Unexpected API response status: ${response.status}`);
+        return [];
+      }
+
+      if (!response.data) {
+        console.error('[DEBUG] Empty API response data');
+        return [];
+      }
+
+      // Log response structure
+      console.log('[DEBUG] API Response structure:', {
+        type: typeof response.data,
         isArray: Array.isArray(response.data),
-        hasData: response.data?.data !== undefined,
-        hasResult: response.data?.result !== undefined,
-        type: typeof response.data
+        hasData: Boolean(response.data?.data),
+        hasResult: Boolean(response.data?.result),
+        keys: Object.keys(response.data)
       });
 
       // Handle various response formats
@@ -56,6 +67,19 @@ export class PumpFunService {
       }
 
       console.log(`[DEBUG] Found ${tokens.length} total tokens from API`);
+      if (tokens.length === 0) {
+        console.log('[DEBUG] No tokens returned from API');
+        return [];
+      }
+
+      // Sample the first token for debugging
+      if (tokens.length > 0) {
+        console.log('[DEBUG] First token from API:', {
+          address: tokens[0].address || tokens[0].tokenAddress,
+          name: tokens[0].name,
+          timestamp: tokens[0].timestamp || tokens[0].createdAt
+        });
+      }
 
       // Initialize user's seen tokens set if not exists
       if (!this.lastSeenTokens.has(userId)) {

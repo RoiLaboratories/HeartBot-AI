@@ -1499,10 +1499,21 @@ export class TelegramService {
 
   private async handleFetch(ctx: CustomContext) {
     const telegramId = ctx.from?.id.toString();
-    if (!telegramId) return;
+    if (!telegramId) {
+      console.log('[DEBUG] Could not identify user');
+      return;
+    }
 
     try {
+      // Check if monitoring is already enabled
+      if (this.heartBot.isMonitoringEnabled(telegramId)) {
+        console.log(`[DEBUG] Monitoring already enabled for user ${telegramId}`);
+        await ctx.reply('✅ Monitoring is already active. Use /stop to disable monitoring.');
+        return;
+      }
+
       // Get user's active filters
+      console.log(`[DEBUG] Fetching active filters for user ${telegramId}`);
       const { data: filters, error } = await this.adminClient
         .from('Filter')
         .select('*')
@@ -1516,17 +1527,22 @@ export class TelegramService {
       }
 
       if (!filters || filters.length === 0) {
+        console.log(`[DEBUG] No active filters found for user ${telegramId}`);
         await ctx.reply('❌ No active filters found. Use /setfilter to create one.');
         return;
       }
 
+      console.log(`[DEBUG] Found ${filters.length} active filters for user ${telegramId}`);
+
       // Enable monitoring for this user
+      console.log(`[DEBUG] Enabling monitoring for user ${telegramId}`);
       this.heartBot.enableMonitoring(telegramId);
       
-      // Start monitoring and send confirmation
-      await ctx.reply('✅ Token monitoring started! You will receive alerts when new tokens match your filters.\n\nUse /stop to disable monitoring.');
+      // Log current monitoring status
+      const activeCount = this.heartBot.getActiveMonitoringCount();
+      console.log(`[DEBUG] Current active monitoring users: ${activeCount}`);
 
-      // Optionally check current filters
+      // Format filter summary
       const filterDescriptions = filters.map((filter, index) => {
         const parts = [];
         if (filter.min_market_cap) parts.push(`Min MC: $${filter.min_market_cap}`);
@@ -1536,9 +1552,15 @@ export class TelegramService {
         return `Filter ${index + 1}:\n${parts.join('\n')}`;
       });
 
-      if (filterDescriptions.length > 0) {
-        await ctx.reply('Your active filters:\n\n' + filterDescriptions.join('\n\n'));
-      }
+      // Send confirmation with filter details
+      const message = '✅ Token monitoring started!\n\n' +
+                     'Your active filters:\n\n' +
+                     filterDescriptions.join('\n\n') +
+                     '\n\nYou will receive alerts when new tokens match these criteria.\n' +
+                     'Use /stop to disable monitoring.';
+      
+      await ctx.reply(message, { parse_mode: 'HTML' });
+      console.log(`[DEBUG] Monitoring confirmation sent to user ${telegramId}`);
 
     } catch (error) {
       console.error('[DEBUG] Error in handleFetch:', error);
@@ -1548,15 +1570,18 @@ export class TelegramService {
 
   public matchesFilter(token: TokenData, filter: any): boolean {
     console.log(`\n[DEBUG] ==== Checking Filter Match for ${token.address} ====`);
-    console.log(`[DEBUG] Token data:`, {
-      marketCap: token.marketCap,
-      liquidity: token.liquidity,
-      holdersCount: token.holdersCount,
-      devTokensPercentage: token.devTokensPercentage,
-      contractAge: token.contractAge,
-      tradingEnabled: token.tradingEnabled
-    });
-    console.log(`[DEBUG] Filter criteria:`, filter);
+    console.log(`[DEBUG] Full token data:`, token);
+    console.log(`[DEBUG] Full filter criteria:`, filter);
+    
+    // Validate required token data
+    if (!token.marketCap && token.marketCap !== 0) {
+      console.log(`[DEBUG] Token ${token.address} missing marketCap`);
+      return false;
+    }
+    if (!token.liquidity && token.liquidity !== 0) {
+      console.log(`[DEBUG] Token ${token.address} missing liquidity`);
+      return false;
+    }
 
     // Market cap check
     if (filter.min_market_cap && token.marketCap !== undefined) {
@@ -1565,6 +1590,7 @@ export class TelegramService {
         console.log(`[DEBUG] Failed min market cap check: ${token.marketCap} < ${filter.min_market_cap}`);
         return false;
       }
+      console.log(`[DEBUG] Passed min market cap check`);
     }
     
     if (filter.max_market_cap && token.marketCap !== undefined) {
@@ -1573,6 +1599,7 @@ export class TelegramService {
         console.log(`[DEBUG] Failed max market cap check: ${token.marketCap} > ${filter.max_market_cap}`);
         return false;
       }
+      console.log(`[DEBUG] Passed max market cap check`);
     }
 
     // Liquidity check
@@ -1582,6 +1609,7 @@ export class TelegramService {
         console.log(`[DEBUG] Failed min liquidity check: ${token.liquidity} < ${filter.min_liquidity}`);
         return false;
       }
+      console.log(`[DEBUG] Passed min liquidity check`);
     }
     
     if (filter.max_liquidity && token.liquidity !== undefined) {
@@ -1590,18 +1618,21 @@ export class TelegramService {
         console.log(`[DEBUG] Failed max liquidity check: ${token.liquidity} > ${filter.max_liquidity}`);
         return false;
       }
+      console.log(`[DEBUG] Passed max liquidity check`);
     }
 
-    // Holders check - skip if data not available
+    // Skip holder checks if data not available
     if ((filter.min_holders || filter.max_holders) && token.holdersCount === undefined) {
       console.log('[DEBUG] Skipping holder checks - data not available');
     } else {
+      // Holders check
       if (filter.min_holders && token.holdersCount !== undefined) {
         console.log(`[DEBUG] Checking min holders: ${token.holdersCount} >= ${filter.min_holders}`);
         if (token.holdersCount < filter.min_holders) {
           console.log(`[DEBUG] Failed min holders check: ${token.holdersCount} < ${filter.min_holders}`);
           return false;
         }
+        console.log(`[DEBUG] Passed min holders check`);
       }
 
       if (filter.max_holders && token.holdersCount !== undefined) {
@@ -1610,10 +1641,11 @@ export class TelegramService {
           console.log(`[DEBUG] Failed max holders check: ${token.holdersCount} > ${filter.max_holders}`);
           return false;
         }
+        console.log(`[DEBUG] Passed max holders check`);
       }
     }
 
-    // Dev tokens check - skip if not available
+    // Skip dev tokens check if not available
     if (filter.max_dev_tokens && token.devTokensPercentage === undefined) {
       console.log('[DEBUG] Skipping dev tokens check - data not available');
     } else if (filter.max_dev_tokens && token.devTokensPercentage !== undefined) {
@@ -1622,9 +1654,10 @@ export class TelegramService {
         console.log(`[DEBUG] Failed max dev tokens check: ${token.devTokensPercentage} > ${filter.max_dev_tokens}`);
         return false;
       }
+      console.log(`[DEBUG] Passed dev tokens check`);
     }
 
-    // Contract age check - skip if not available
+    // Skip contract age check if not available
     if (filter.min_contract_age && token.contractAge === undefined) {
       console.log('[DEBUG] Skipping contract age check - data not available');
     } else if (filter.min_contract_age && token.contractAge !== undefined) {
@@ -1633,6 +1666,7 @@ export class TelegramService {
         console.log(`[DEBUG] Failed min contract age check: ${token.contractAge} < ${filter.min_contract_age}`);
         return false;
       }
+      console.log(`[DEBUG] Passed contract age check`);
     }
 
     // Trading status check
@@ -1642,50 +1676,12 @@ export class TelegramService {
         console.log(`[DEBUG] Failed trading status check: ${token.tradingEnabled} !== ${filter.trading_enabled}`);
         return false;
       }
+      console.log(`[DEBUG] Passed trading status check`);
     }
 
-    console.log(`[DEBUG] Token ${token.address} passed all filter checks ✅`);
+    console.log(`[DEBUG] ✅ Token ${token.address} passed all filter checks`);
     return true;
   }
-
-//  private async handleFetch(ctx: Context) {
-//   const userId = ctx.from?.id.toString();
-//   if (!userId) {
-//     await ctx.reply('❌ Error: Could not identify user');
-//     return;
-//   }
-
-//   try {
-//     // Enable monitoring for this user
-//     this.heartBot.enableMonitoring(userId);
-
-//     // Optionally start the monitoring loop (only starts if not already running)
-//     this.heartBot.startMonitoringLoop();
-
-//     await ctx.reply('✅ Token monitoring started! You will receive alerts when new tokens match your filters.');
-
-//     // Optional: Send a test alert to confirm
-//     const testToken: TokenData = {
-//       address: '0x123',
-//       name: 'TestToken',
-//       symbol: 'TTK',
-//       marketCap: 50000,
-//       liquidity: 10000,
-//       fdv: 100000,
-//       holdersCount: 120,
-//       tradingEnabled: true,
-//       contractAge: 1,
-//       devTokensPercentage: 5,
-//     };
-
-//      console.log(`[DEBUG] Preparing to send token alert to user ${userId}`);
-//     await this.sendTokenAlert(userId, testToken);
-//   } catch (error) {
-//     console.error('[handleFetch] Error starting monitoring:', error);
-//     await ctx.reply('❌ Error starting token monitoring. Please try again later.');
-//   }
-// }
-
     
   private async handleStop(ctx: Context) {
     const userId = ctx.from?.id.toString();
