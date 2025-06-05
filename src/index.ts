@@ -23,6 +23,16 @@ export class HeartBot {
       return;
     }
 
+    // Check if we have any active users before starting
+    const activeUsers = Array.from(this.monitoringEnabled.entries())
+      .filter(([_, enabled]) => enabled)
+      .map(([userId]) => userId);
+
+    if (activeUsers.length === 0) {
+      console.log('[DEBUG] No active users to monitor, not starting loop');
+      return;
+    }
+
     console.log('[HeartBot] Starting monitoring loop...');
     this.isRunning = true;
     
@@ -162,6 +172,7 @@ export class HeartBot {
       config.supabase.url,
       config.supabase.serviceRoleKey
     );
+    this.isRunning = false; // Initialize as not running
     this.telegram = new TelegramService(this);
 
     // Add test route
@@ -215,11 +226,16 @@ export class HeartBot {
         try {
           await this.telegram.start();
           console.log('[DEBUG] Telegram bot started');
-          // Set running state after successful start
-          this.isRunning = true;
+          // Clear any existing state
+          this.monitoringEnabled.clear();
+          if (this.monitoringIntervalId) {
+            clearInterval(this.monitoringIntervalId);
+            this.monitoringIntervalId = undefined;
+          }
+          this.isRunning = false;
           
           // Don't start token monitoring yet - it will start when users request it
-          console.log('[DEBUG] Bot ready to monitor tokens when requested');
+          console.log('[DEBUG] Bot ready to monitor tokens when requested with /fetch');
         } catch (error: any) {
           if (error.response?.error_code === 429) {
             console.log('[DEBUG] Rate limit hit while starting bot, will retry on next request');
@@ -582,6 +598,12 @@ export class HeartBot {
 
   // Add methods to control monitoring
   enableMonitoring(userId: string) {
+    // Check if monitoring was already enabled for this user
+    if (this.monitoringEnabled.get(userId)) {
+      console.log(`[DEBUG] Monitoring was already enabled for user ${userId}`);
+      return;
+    }
+
     console.log(`[DEBUG] Enabling monitoring for user ${userId}`);
     this.monitoringEnabled.set(userId, true);
     console.log(`[DEBUG] Current monitoring state:`, Array.from(this.monitoringEnabled.entries()));
@@ -599,6 +621,15 @@ export class HeartBot {
     console.log(`[DEBUG] Disabling monitoring for user ${userId}`);
     this.monitoringEnabled.set(userId, false);
     console.log(`[DEBUG] Current monitoring state:`, Array.from(this.monitoringEnabled.entries()));
+    
+    // Check if there are any active users left
+    const activeUsers = Array.from(this.monitoringEnabled.values()).filter(enabled => enabled);
+    if (activeUsers.length === 0 && this.monitoringIntervalId) {
+      console.log('[DEBUG] No active users left, stopping monitoring loop');
+      clearInterval(this.monitoringIntervalId);
+      this.monitoringIntervalId = undefined;
+      this.isRunning = false;
+    }
   }
 
   isMonitoringEnabled(userId: string): boolean {
