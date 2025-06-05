@@ -10,170 +10,34 @@ export class HeartBot {
   public telegram: TelegramService;
   private pumpFun: PumpFunService;
   private server: FastifyInstance;
-  public isRunning: boolean = true;
+  public isRunning: boolean = false;
   private adminClient;
   private monitoringEnabled: Map<string, boolean> = new Map();
   private serverStarted: boolean = false;
   private initializationPromise: Promise<void> | null = null;
   public monitoringIntervalId: NodeJS.Timeout | undefined;
-
-  public startMonitoringLoop() {
-    if (this.monitoringIntervalId) {
-      console.log('[DEBUG] Monitoring loop already running, skipping start');
-      return;
-    }
-
-    // Check if we have any active users before starting
-    const activeUsers = Array.from(this.monitoringEnabled.entries())
-      .filter(([_, enabled]) => enabled)
-      .map(([userId]) => userId);
-
-    if (activeUsers.length === 0) {
-      console.log('[DEBUG] No active users to monitor, not starting loop');
-      return;
-    }
-
-    console.log('[HeartBot] Starting monitoring loop...');
-    this.isRunning = true;
-    
-    // Reset last checked timestamp to start fresh
-    this.pumpFun.resetLastCheckedTimestamp();
-    console.log('[DEBUG] Reset last checked timestamp');
-
-    let isProcessing = false;
-
-    this.monitoringIntervalId = setInterval(async () => {
-      if (isProcessing) {
-        console.log('[DEBUG] Previous cycle still processing, skipping this cycle');
-        return;
-      }
-
-      try {
-        isProcessing = true;
-        const now = new Date().toISOString();
-        console.log(`\n[DEBUG] ===== Starting New Monitoring Cycle at ${now} =====`);
-
-        // Get active users
-        const activeUsers = Array.from(this.monitoringEnabled.entries())
-          .filter(([_, enabled]) => enabled)
-          .map(([userId, _]) => userId);
-
-        if (activeUsers.length === 0) {
-          console.log('[DEBUG] No active users, skipping cycle');
-          isProcessing = false;
-          return;
-        }
-
-        // Process each active user
-        for (const userId of activeUsers) {
-          try {
-            // Double check if user is still enabled
-            if (!this.monitoringEnabled.get(userId)) {
-              console.log(`[DEBUG] Monitoring disabled for user ${userId}, skipping`);
-              continue;
-            }
-
-            console.log(`\n[DEBUG] Processing user ${userId} at ${new Date().toISOString()}`);
-
-            // Get user's active filters
-            const { data: filters, error } = await this.adminClient
-              .from('Filter')
-              .select('*')
-              .eq('user_id', userId)
-              .eq('is_active', true);
-
-            if (error) {
-              console.error(`[DEBUG] Error fetching filters for user ${userId}:`, error);
-              continue;
-            }
-
-            if (!filters || filters.length === 0) {
-              console.log(`[DEBUG] No active filters found for user ${userId}`);
-              continue;
-            }
-
-            // Log filter details
-            console.log(`[DEBUG] Found ${filters.length} active filters for user ${userId}:`);
-            filters.forEach((filter, index) => {
-              console.log(`[DEBUG] Filter ${index + 1}:`, filter);
-            });
-
-            // Fetch new tokens with retry logic
-            console.log(`[DEBUG] Fetching new tokens for user ${userId}...`);
-            const tokens = await this.pumpFun.getNewTokens(userId);
-            console.log(`[DEBUG] Fetched ${tokens.length} new tokens for user ${userId}`);
-
-            if (tokens.length === 0) {
-              console.log(`[DEBUG] No new tokens found for user ${userId}`);
-              continue;
-            }
-
-            let alertsSent = 0;
-            for (const token of tokens) {
-              console.log(`\n[DEBUG] Processing token ${token.address}`);
-              let matched = false;
-              
-              for (const filter of filters) {
-                try {
-                  if (this.telegram.matchesFilter(token, filter)) {
-                    console.log(`[DEBUG] Token ${token.address} matched filter for user ${userId}. Sending alert...`);
-                    await this.telegram.sendTokenAlert(userId, token);
-                    console.log(`[DEBUG] Alert sent successfully for token ${token.address}`);
-                    matched = true;
-                    alertsSent++;
-                    break;
-                  }
-                } catch (error) {
-                  console.error(`[DEBUG] Error checking token ${token.address} against filter:`, error);
-                  continue;
-                }
-              }
-
-              if (!matched) {
-                console.log(`[DEBUG] Token ${token.address} did not match any filters for user ${userId}`);
-              }
-            }
-
-            console.log(`[DEBUG] Sent ${alertsSent} alerts for user ${userId} in this cycle`);
-
-          } catch (error) {
-            console.error(`[DEBUG] Error processing user ${userId}:`, error);
-            continue;
-          }
-        }
-
-        console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
-      } catch (error) {
-        console.error('[DEBUG] Error in monitoring cycle:', error);
-      } finally {
-        isProcessing = false;
-      }
-    }, 30 * 1000); // Check every 30 seconds
-
-    console.log('[DEBUG] Monitoring loop started successfully');
-  }
-
-
-  // public getMonitoringIntervalId(): NodeJS.Timeout | undefined {
-  //   return this.monitoringIntervalId;
-  // }
- 
-  getActiveMonitoringCount(): number {
-    return Array.from(this.monitoringEnabled.values()).filter(enabled => enabled).length;
-  }
+  private isInitialized: boolean = false;
 
   constructor() {
-    this.pumpFun = new PumpFunService();
-    this.server = fastify();
     if (!config.supabase.url || !config.supabase.serviceRoleKey) {
       throw new Error('Missing required Supabase configuration');
     }
+    
+    this.pumpFun = new PumpFunService();
+    this.server = fastify();
     this.adminClient = createClient(
       config.supabase.url,
       config.supabase.serviceRoleKey
     );
-    this.isRunning = false; // Initialize as not running
+    this.isRunning = false;
     this.telegram = new TelegramService(this);
+    
+    // Initialize monitoring state
+    this.monitoringEnabled.clear();
+    if (this.monitoringIntervalId) {
+      clearInterval(this.monitoringIntervalId);
+      this.monitoringIntervalId = undefined;
+    }
 
     // Add test route
     this.server.get('/', async (request, reply) => {
@@ -187,6 +51,161 @@ export class HeartBot {
         await middleware(request.raw, reply.raw);
       });
     }
+  }
+
+  public startMonitoringLoop() {
+    try {
+      if (!this.isInitialized) {
+        console.log('[DEBUG] Bot not fully initialized, cannot start monitoring');
+        return;
+      }
+
+      if (this.monitoringIntervalId) {
+        console.log('[DEBUG] Monitoring loop already running, skipping start');
+        return;
+      }
+
+      // Check if we have any active users before starting
+      const activeUsers = Array.from(this.monitoringEnabled.entries())
+        .filter(([_, enabled]) => enabled)
+        .map(([userId]) => userId);
+
+      if (activeUsers.length === 0) {
+        console.log('[DEBUG] No active users to monitor, not starting loop');
+        return;
+      }
+
+      console.log('[HeartBot] Starting monitoring loop...');
+      this.isRunning = true;
+      
+      // Reset last checked timestamp to start fresh
+      this.pumpFun.resetLastCheckedTimestamp();
+      console.log('[DEBUG] Reset last checked timestamp');
+
+      let isProcessing = false;
+
+      this.monitoringIntervalId = setInterval(async () => {
+        if (isProcessing) {
+          console.log('[DEBUG] Previous cycle still processing, skipping this cycle');
+          return;
+        }
+
+        try {
+          isProcessing = true;
+          const now = new Date().toISOString();
+          console.log(`\n[DEBUG] ===== Starting New Monitoring Cycle at ${now} =====`);
+
+          // Get active users
+          const activeUsers = Array.from(this.monitoringEnabled.entries())
+            .filter(([_, enabled]) => enabled)
+            .map(([userId, _]) => userId);
+
+          if (activeUsers.length === 0) {
+            console.log('[DEBUG] No active users, skipping cycle');
+            isProcessing = false;
+            return;
+          }
+
+          // Process each active user
+          for (const userId of activeUsers) {
+            try {
+              // Double check if user is still enabled
+              if (!this.monitoringEnabled.get(userId)) {
+                console.log(`[DEBUG] Monitoring disabled for user ${userId}, skipping`);
+                continue;
+              }
+
+              console.log(`\n[DEBUG] Processing user ${userId} at ${new Date().toISOString()}`);
+
+              // Get user's active filters
+              const { data: filters, error } = await this.adminClient
+                .from('Filter')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('is_active', true);
+
+              if (error) {
+                console.error(`[DEBUG] Error fetching filters for user ${userId}:`, error);
+                continue;
+              }
+
+              if (!filters || filters.length === 0) {
+                console.log(`[DEBUG] No active filters found for user ${userId}`);
+                continue;
+              }
+
+              // Log filter details
+              console.log(`[DEBUG] Found ${filters.length} active filters for user ${userId}:`);
+              filters.forEach((filter, index) => {
+                console.log(`[DEBUG] Filter ${index + 1}:`, filter);
+              });
+
+              // Fetch new tokens with retry logic
+              console.log(`[DEBUG] Fetching new tokens for user ${userId}...`);
+              const tokens = await this.pumpFun.getNewTokens(userId);
+              console.log(`[DEBUG] Fetched ${tokens.length} new tokens for user ${userId}`);
+
+              if (tokens.length === 0) {
+                console.log(`[DEBUG] No new tokens found for user ${userId}`);
+                continue;
+              }
+
+              let alertsSent = 0;
+              for (const token of tokens) {
+                console.log(`\n[DEBUG] Processing token ${token.address}`);
+                let matched = false;
+                
+                for (const filter of filters) {
+                  try {
+                    if (this.telegram.matchesFilter(token, filter)) {
+                      console.log(`[DEBUG] Token ${token.address} matched filter for user ${userId}. Sending alert...`);
+                      await this.telegram.sendTokenAlert(userId, token);
+                      console.log(`[DEBUG] Alert sent successfully for token ${token.address}`);
+                      matched = true;
+                      alertsSent++;
+                      break;
+                    }
+                  } catch (error) {
+                    console.error(`[DEBUG] Error checking token ${token.address} against filter:`, error);
+                    continue;
+                  }
+                }
+
+                if (!matched) {
+                  console.log(`[DEBUG] Token ${token.address} did not match any filters for user ${userId}`);
+                }
+              }
+
+              console.log(`[DEBUG] Sent ${alertsSent} alerts for user ${userId} in this cycle`);
+
+            } catch (error) {
+              console.error(`[DEBUG] Error processing user ${userId}:`, error);
+              continue;
+            }
+          }
+
+          console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
+        } catch (error) {
+          console.error('[DEBUG] Error in monitoring cycle:', error);
+        } finally {
+          isProcessing = false;
+        }
+      }, 30 * 1000); // Check every 30 seconds
+
+      console.log('[DEBUG] Monitoring loop started successfully');
+    } catch (error) {
+      console.error('[DEBUG] Error starting monitoring loop:', error);
+      this.cleanup();
+    }
+  }
+
+
+  // public getMonitoringIntervalId(): NodeJS.Timeout | undefined {
+  //   return this.monitoringIntervalId;
+  // }
+ 
+  getActiveMonitoringCount(): number {
+    return Array.from(this.monitoringEnabled.values()).filter(enabled => enabled).length;
   }
 
   async start() {
@@ -226,6 +245,7 @@ export class HeartBot {
         try {
           await this.telegram.start();
           console.log('[DEBUG] Telegram bot started');
+          
           // Clear any existing state
           this.monitoringEnabled.clear();
           if (this.monitoringIntervalId) {
@@ -233,6 +253,7 @@ export class HeartBot {
             this.monitoringIntervalId = undefined;
           }
           this.isRunning = false;
+          this.isInitialized = true;
           
           // Don't start token monitoring yet - it will start when users request it
           console.log('[DEBUG] Bot ready to monitor tokens when requested with /fetch');
@@ -249,6 +270,7 @@ export class HeartBot {
       } catch (error) {
         console.error('[DEBUG] Error starting HeartBot:', error);
         this.isRunning = false;
+        this.isInitialized = false;
         this.initializationPromise = null;
         await this.stop();
         throw error;
@@ -629,9 +651,10 @@ export class HeartBot {
       clearInterval(this.monitoringIntervalId);
       this.monitoringIntervalId = undefined;
       this.isRunning = false;
+      this.pumpFun.resetLastCheckedTimestamp();
     }
   }
-
+  
   isMonitoringEnabled(userId: string): boolean {
     const enabled = this.monitoringEnabled.get(userId) || false;
     console.log(`[DEBUG] Checking monitoring status for user ${userId}: ${enabled}`);
