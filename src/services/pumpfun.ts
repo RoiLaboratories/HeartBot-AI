@@ -15,7 +15,8 @@ export class PumpFunService {
 
   resetLastCheckedTimestamp() {
     console.log('[DEBUG] Resetting last checked timestamp and clearing token cache');
-    this.lastCheckedTimestamp = Date.now() - (15 * 60 * 1000); // Start from 15 minutes ago
+    // Start from 5 minutes ago instead of 15 to catch more recent tokens
+    this.lastCheckedTimestamp = Date.now() - (5 * 60 * 1000);
     this.lastSeenTokens.clear();
     console.log(`[DEBUG] New lastCheckedTimestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
   }
@@ -80,16 +81,23 @@ export class PumpFunService {
         let tokenTimestamp = token.timestamp || token.createdAt;
         if (typeof tokenTimestamp === 'string') {
           tokenTimestamp = new Date(tokenTimestamp).getTime();
-        } else if (tokenTimestamp && tokenTimestamp < 1000000000000) {
-          // If timestamp is in seconds, convert to milliseconds
-          tokenTimestamp = tokenTimestamp * 1000;
+        } else if (typeof tokenTimestamp === 'number') {
+          // Always convert to milliseconds if it's a timestamp
+          tokenTimestamp = tokenTimestamp < 1000000000000 ? tokenTimestamp * 1000 : tokenTimestamp;
+        } else {
+          // If no timestamp, use current time
+          tokenTimestamp = Date.now();
+          console.log(`[DEBUG] No timestamp found for token ${tokenAddress}, using current time`);
         }
 
-        console.log(`[DEBUG] Token ${tokenAddress} timestamp: ${new Date(tokenTimestamp).toISOString()}, Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+        console.log(`[DEBUG] Token ${tokenAddress}:`);
+        console.log(`- Raw timestamp: ${token.timestamp || token.createdAt}`);
+        console.log(`- Processed timestamp: ${new Date(tokenTimestamp).toISOString()}`);
+        console.log(`- Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
 
         // Skip tokens that are too old
-        if (!tokenTimestamp || tokenTimestamp <= this.lastCheckedTimestamp) {
-          console.log(`[DEBUG] Skipping old token ${tokenAddress}: ${tokenTimestamp} <= ${this.lastCheckedTimestamp}`);
+        if (tokenTimestamp <= this.lastCheckedTimestamp) {
+          console.log(`[DEBUG] Skipping old token ${tokenAddress}: ${new Date(tokenTimestamp).toISOString()} <= ${new Date(this.lastCheckedTimestamp).toISOString()}`);
           continue;
         }
 
@@ -121,12 +129,30 @@ export class PumpFunService {
             devTokensPercentage: parseFloat(token.devTokensPercentage || '0')
           };
 
-          // Only add token if it has liquidity
-          if (tokenData.liquidity > 0) {
-            console.log(`[DEBUG] Adding new token: ${tokenData.address}`);
-            seen.add(tokenAddress);
-            newTokens.push(tokenData);
+          // Enhanced validation
+          const isValidToken = 
+            tokenData.address &&
+            tokenData.liquidity > 0 &&
+            tokenData.marketCap > 0;
+
+          if (!isValidToken) {
+            console.log(`[DEBUG] Invalid token data for ${tokenAddress}:`, {
+              hasAddress: !!tokenData.address,
+              liquidity: tokenData.liquidity,
+              marketCap: tokenData.marketCap
+            });
+            continue;
           }
+
+          console.log(`[DEBUG] Valid token found: ${tokenData.address}`, {
+            name: tokenData.name,
+            liquidity: tokenData.liquidity,
+            marketCap: tokenData.marketCap,
+            timestamp: new Date(tokenTimestamp).toISOString()
+          });
+
+          seen.add(tokenAddress);
+          newTokens.push(tokenData);
         } catch (error) {
           console.error(`[DEBUG] Error processing token ${tokenAddress}:`, error);
         }
