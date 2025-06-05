@@ -35,13 +35,21 @@ export class PumpFunService {
           'Accept': 'application/json'
         },
         params: {
-          limit: config.moralis.tokenFetchLimit || 100
+          limit: config.moralis.tokenFetchLimit || 100,
+          from_timestamp: Math.floor(this.lastCheckedTimestamp / 1000), // Convert to seconds
+          to_timestamp: Math.floor(currentTime / 1000) // Convert to seconds
         },
         timeout: 30000
       });
 
-      // Enhanced API response logging
+      // Enhanced API response logging with full data
       console.log('\n[DEBUG] ==== API Response Details ====');
+      console.log('[DEBUG] Full API Response:', JSON.stringify(response.data, null, 2));
+      console.log('[DEBUG] API Request Parameters:', {
+        limit: config.moralis.tokenFetchLimit || 100,
+        from_timestamp: new Date(this.lastCheckedTimestamp).toISOString(),
+        to_timestamp: new Date(currentTime).toISOString()
+      });
       console.log('[DEBUG] Response status:', response.status);
       console.log('[DEBUG] Response headers:', response.headers);
       if (response.data) {
