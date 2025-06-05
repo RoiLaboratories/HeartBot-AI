@@ -15,8 +15,8 @@ export class PumpFunService {
 
   resetLastCheckedTimestamp() {
     console.log('[DEBUG] Resetting last checked timestamp and clearing token cache');
-    // Start from 5 minutes ago instead of 15 to catch more recent tokens
-    this.lastCheckedTimestamp = Date.now() - (5 * 60 * 1000);
+    // Start from just 1 minute ago to catch very recent tokens
+    this.lastCheckedTimestamp = Date.now() - (1 * 60 * 1000);
     this.lastSeenTokens.clear();
     console.log(`[DEBUG] New lastCheckedTimestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
   }
@@ -40,13 +40,23 @@ export class PumpFunService {
         timeout: 30000
       });
 
-      // Log raw response
-      console.log('[DEBUG] Raw API response:', {
+      // Enhanced API response logging
+      console.log('\n[DEBUG] ==== API Response Details ====');
+      console.log('[DEBUG] Response status:', response.status);
+      console.log('[DEBUG] Response headers:', response.headers);
+      if (response.data) {
+        console.log('[DEBUG] First token in response:', JSON.stringify(response.data?.[0] || response.data?.data?.[0] || response.data?.result?.[0], null, 2));
+      }
+      
+      // Log raw response stats
+      console.log('[DEBUG] Raw API response stats:', {
         status: response.status,
         hasData: !!response.data,
         dataType: typeof response.data,
         isArray: Array.isArray(response.data),
-        firstItem: response.data?.[0] || response.data?.data?.[0] || response.data?.result?.[0]
+        dataLength: Array.isArray(response.data) ? response.data.length : 
+                   Array.isArray(response.data?.data) ? response.data.data.length :
+                   Array.isArray(response.data?.result) ? response.data.result.length : 0
       });
 
       // Initialize user's seen tokens set if not exists
@@ -172,12 +182,26 @@ export class PumpFunService {
         this.lastSeenTokens.clear();
       }
 
-      // Only update timestamp if we found some tokens, otherwise use a smaller increment
-      if (tokens.length > 0) {
-        this.lastCheckedTimestamp = currentTime;
+      // Modified timestamp update logic to be more aggressive
+      if (tokens.length === 0) {
+        // If no tokens found, move timestamp forward by only 10 seconds
+        const smallIncrement = 10000; // 10 seconds
+        this.lastCheckedTimestamp = Math.min(currentTime, this.lastCheckedTimestamp + smallIncrement);
+        console.log(`[DEBUG] No tokens found, small increment applied. New timestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
       } else {
-        // If no tokens found, only move timestamp forward by 30 seconds to avoid missing tokens
-        this.lastCheckedTimestamp = Math.min(currentTime, this.lastCheckedTimestamp + 30000);
+        // If tokens found, use the most recent token's timestamp
+        const mostRecentToken = tokens.reduce((latest, token) => {
+          const tokenTime = token.timestamp || token.createdAt || 0;
+          return tokenTime > latest ? tokenTime : latest;
+        }, 0);
+        
+        if (mostRecentToken > 0) {
+          this.lastCheckedTimestamp = mostRecentToken;
+          console.log(`[DEBUG] Using most recent token timestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+        } else {
+          this.lastCheckedTimestamp = currentTime;
+          console.log(`[DEBUG] No valid token timestamps, using current time: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+        }
       }
 
       console.log(`[DEBUG] Updated lastCheckedTimestamp to: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
