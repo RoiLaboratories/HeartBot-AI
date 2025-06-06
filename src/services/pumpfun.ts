@@ -84,14 +84,66 @@ export class PumpFunService {
         console.log(`[DEBUG] Current seen tokens for user ${userId}: ${seen.size}`);
         
         // Handle various response formats
-        const tokens = Array.isArray(response.data) ? response.data : 
-                      response.data?.data ? response.data.data :
-                      response.data?.result ? response.data.result : [];
+        const rawTokens = Array.isArray(response.data) ? response.data : 
+                         response.data?.data ? response.data.data :
+                         response.data?.result ? response.data.result : [];
 
-        if (!Array.isArray(tokens)) {
+        if (!Array.isArray(rawTokens)) {
           console.log('[DEBUG] Invalid response format - expected array');
           return [];
         }
+
+        // Transform raw tokens into TokenData format
+        const tokens: TokenData[] = rawTokens.map(rawToken => {
+          // Convert string values to numbers where needed
+          const liquidity = typeof rawToken.liquidity === 'string' ? parseFloat(rawToken.liquidity) : rawToken.liquidity;
+          const priceUsd = typeof rawToken.priceUsd === 'string' ? parseFloat(rawToken.priceUsd) : rawToken.priceUsd;
+          
+          // Calculate marketCap if not provided but we have price and liquidity
+          let marketCap = rawToken.marketCap;
+          if (!marketCap && priceUsd && liquidity) {
+            marketCap = liquidity * 2; // Estimate as 2x liquidity for new tokens
+          }
+
+          // Convert to match TokenData interface exactly
+          return {
+            address: rawToken.address || rawToken.token_address || '',
+            name: rawToken.name || rawToken.token_name || 'Unknown',
+            symbol: rawToken.symbol || rawToken.token_symbol || 'UNKNOWN',
+            priceUsd: priceUsd?.toString(),
+            marketCap: marketCap || 0,
+            liquidity: liquidity || 0,
+            fdv: rawToken.fdv || (marketCap ? marketCap * 2 : 0),
+            holdersCount: rawToken.holdersCount || 0,
+            tradingEnabled: rawToken.tradingEnabled || false,
+            contractAge: rawToken.contractAge || 0,
+            devTokensPercentage: rawToken.devTokensPercentage
+          };
+        }).filter(token => {
+          // Filter out invalid tokens
+          if (!token.address) {
+            console.log('[DEBUG] Skipping token - missing address');
+            return false;
+          }
+          if (!token.liquidity || token.liquidity <= 0) {
+            console.log(`[DEBUG] Skipping token ${token.address} - invalid liquidity`);
+            return false;
+          }
+          if (!token.priceUsd || token.priceUsd <= 0) {
+            console.log(`[DEBUG] Skipping token ${token.address} - invalid price`);
+            return false;
+          }
+          return true;
+        });
+
+        // Log processed tokens for debugging
+        console.log('[DEBUG] Processed tokens:', tokens.map(token => ({
+          address: token.address,
+          name: token.name,
+          marketCap: token.marketCap,
+          liquidity: token.liquidity,
+          priceUsd: token.priceUsd
+        })));
 
         return tokens;
 
