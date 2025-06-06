@@ -22,203 +22,107 @@ export class PumpFunService {
   }
 
   async getNewTokens(userId: string): Promise<TokenData[]> {
-    try {
-      console.log('\n[DEBUG] ==== Fetching New Tokens ====');
-      console.log(`[DEBUG] Fetching tokens for user ${userId}`);
-      const currentTime = Date.now();
-      console.log(`[DEBUG] Current time: ${new Date(currentTime).toISOString()}`);
-      console.log(`[DEBUG] Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-      
-      const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
-        headers: {
-          'X-API-Key': config.moralis.apiKey,
-          'Accept': 'application/json'
-        },
-        params: {
+    console.log('\n[DEBUG] ==== Fetching New Tokens ====');
+    console.log(`[DEBUG] Fetching tokens for user ${userId}`);
+    const currentTime = Date.now();
+    console.log(`[DEBUG] Current time: ${new Date(currentTime).toISOString()}`);
+    console.log(`[DEBUG] Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+    
+    let retryCount = 0;
+    const maxRetries = 3;
+    const baseTimeout = 45000; // 45 seconds base timeout
+    const baseDelay = 2000; // Base delay for exponential backoff
+
+    while (retryCount <= maxRetries) {
+      try {
+        console.log(`[DEBUG] Attempting to fetch tokens (attempt ${retryCount + 1}/${maxRetries + 1})`);
+        const response = await axios.get('https://solana-gateway.moralis.io/token/mainnet/exchange/pumpfun/new', {
+          headers: {
+            'X-API-Key': config.moralis.apiKey,
+            'Accept': 'application/json'
+          },
+          params: {
+            limit: config.moralis.tokenFetchLimit || 100,
+            from_timestamp: Math.floor(this.lastCheckedTimestamp / 1000),
+            to_timestamp: Math.floor(currentTime / 1000)
+          },
+          timeout: baseTimeout * (retryCount + 1) // Increase timeout with each retry
+        });
+
+        // If we get here, the request was successful
+        console.log('\n[DEBUG] ==== API Response Details ====');
+        console.log('[DEBUG] API Request Parameters:', {
           limit: config.moralis.tokenFetchLimit || 100,
-          from_timestamp: Math.floor(this.lastCheckedTimestamp / 1000), // Convert to seconds
-          to_timestamp: Math.floor(currentTime / 1000) // Convert to seconds
-        },
-        timeout: 30000
-      });
-
-      // Enhanced API response logging with full data
-      console.log('\n[DEBUG] ==== API Response Details ====');
-      console.log('[DEBUG] Full API Response:', JSON.stringify(response.data, null, 2));
-      console.log('[DEBUG] API Request Parameters:', {
-        limit: config.moralis.tokenFetchLimit || 100,
-        from_timestamp: new Date(this.lastCheckedTimestamp).toISOString(),
-        to_timestamp: new Date(currentTime).toISOString()
-      });
-      console.log('[DEBUG] Response status:', response.status);
-      console.log('[DEBUG] Response headers:', response.headers);
-      if (response.data) {
-        console.log('[DEBUG] First token in response:', JSON.stringify(response.data?.[0] || response.data?.data?.[0] || response.data?.result?.[0], null, 2));
-      }
-      
-      // Log raw response stats
-      console.log('[DEBUG] Raw API response stats:', {
-        status: response.status,
-        hasData: !!response.data,
-        dataType: typeof response.data,
-        isArray: Array.isArray(response.data),
-        dataLength: Array.isArray(response.data) ? response.data.length : 
-                   Array.isArray(response.data?.data) ? response.data.data.length :
-                   Array.isArray(response.data?.result) ? response.data.result.length : 0
-      });
-
-      // Initialize user's seen tokens set if not exists
-      if (!this.lastSeenTokens.has(userId)) {
-        this.lastSeenTokens.set(userId, new Set());
-        console.log(`[DEBUG] Initialized new seen tokens set for user ${userId}`);
-      }
-      const seen = this.lastSeenTokens.get(userId)!;
-      console.log(`[DEBUG] Current seen tokens for user ${userId}: ${seen.size}`);
-      
-      // Handle various response formats
-      const tokens = Array.isArray(response.data) ? response.data : 
-                    response.data?.data ? response.data.data :
-                    response.data?.result ? response.data.result : [];
-
-      if (!Array.isArray(tokens) || tokens.length === 0) {
-        console.log('[DEBUG] No tokens returned from API');
-        return [];
-      }
-
-      console.log(`[DEBUG] Found ${tokens.length} total tokens from API`);
-      
-      const newTokens: TokenData[] = [];
-      for (const token of tokens) {
-        const tokenAddress = token.tokenAddress || token.address;
-        if (!tokenAddress) {
-          console.log('[DEBUG] Skipping token without address');
-          continue;
-        }
-
-        // Get token timestamp and convert to milliseconds if needed
-        let tokenTimestamp = token.timestamp || token.createdAt;
-        if (typeof tokenTimestamp === 'string') {
-          tokenTimestamp = new Date(tokenTimestamp).getTime();
-        } else if (typeof tokenTimestamp === 'number') {
-          // Always convert to milliseconds if it's a timestamp
-          tokenTimestamp = tokenTimestamp < 1000000000000 ? tokenTimestamp * 1000 : tokenTimestamp;
-        } else {
-          // If no timestamp, use current time
-          tokenTimestamp = Date.now();
-          console.log(`[DEBUG] No timestamp found for token ${tokenAddress}, using current time`);
-        }
-
-        console.log(`[DEBUG] Token ${tokenAddress}:`);
-        console.log(`- Raw timestamp: ${token.timestamp || token.createdAt}`);
-        console.log(`- Processed timestamp: ${new Date(tokenTimestamp).toISOString()}`);
-        console.log(`- Last checked: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-
-        // Skip tokens that are too old
-        if (tokenTimestamp <= this.lastCheckedTimestamp) {
-          console.log(`[DEBUG] Skipping old token ${tokenAddress}: ${new Date(tokenTimestamp).toISOString()} <= ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-          continue;
-        }
-
-        // Skip previously seen tokens
-        if (seen.has(tokenAddress)) {
-          console.log(`[DEBUG] Skipping previously seen token: ${tokenAddress}`);
-          continue;
-        }
-
-        try {
-          // Parse numeric values with validation
-          const priceUsd = parseFloat(token.priceUsd || '0');
-          const liquidity = parseFloat(token.liquidity || '0');
-          const fdv = token.fullyDilutedValuation ? parseFloat(token.fullyDilutedValuation) : 
-                     (priceUsd && liquidity ? priceUsd * liquidity : liquidity * 2);
-
-          // Create token data
-          const tokenData: TokenData = {
-            address: tokenAddress,
-            name: token.name || 'Unknown',
-            symbol: token.symbol || 'Unknown',
-            priceUsd: priceUsd.toString(),
-            marketCap: fdv,
-            liquidity: liquidity,
-            fdv: fdv,
-            holdersCount: parseInt(token.holdersCount || '0'),
-            tradingEnabled: token.tradingEnabled !== false,
-            contractAge: tokenTimestamp ? this.calculateContractAge(tokenTimestamp) : 0,
-            devTokensPercentage: parseFloat(token.devTokensPercentage || '0')
-          };
-
-          // Enhanced validation
-          const isValidToken = 
-            tokenData.address &&
-            tokenData.liquidity > 0 &&
-            tokenData.marketCap > 0;
-
-          if (!isValidToken) {
-            console.log(`[DEBUG] Invalid token data for ${tokenAddress}:`, {
-              hasAddress: !!tokenData.address,
-              liquidity: tokenData.liquidity,
-              marketCap: tokenData.marketCap
-            });
-            continue;
-          }
-
-          console.log(`[DEBUG] Valid token found: ${tokenData.address}`, {
-            name: tokenData.name,
-            liquidity: tokenData.liquidity,
-            marketCap: tokenData.marketCap,
-            timestamp: new Date(tokenTimestamp).toISOString()
-          });
-
-          seen.add(tokenAddress);
-          newTokens.push(tokenData);
-        } catch (error) {
-          console.error(`[DEBUG] Error processing token ${tokenAddress}:`, error);
-        }
-      }
-
-      // Log before updating timestamp
-      console.log(`[DEBUG] Processing summary:`);
-      console.log(`- Total tokens from API: ${tokens.length}`);
-      console.log(`- New valid tokens found: ${newTokens.length}`);
-      console.log(`- Previously seen tokens: ${seen.size}`);
-      console.log(`- Old timestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-      console.log(`- New timestamp: ${new Date(currentTime).toISOString()}`);
-
-      // Cleanup old seen tokens (older than 1 hour)
-      if (currentTime - this.lastCheckedTimestamp > 3600000) {
-        console.log('[DEBUG] Clearing seen tokens cache (older than 1 hour)');
-        this.lastSeenTokens.clear();
-      }
-
-      // Modified timestamp update logic to be more aggressive
-      if (tokens.length === 0) {
-        // If no tokens found, move timestamp forward by only 10 seconds
-        const smallIncrement = 10000; // 10 seconds
-        this.lastCheckedTimestamp = Math.min(currentTime, this.lastCheckedTimestamp + smallIncrement);
-        console.log(`[DEBUG] No tokens found, small increment applied. New timestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-      } else {
-        // If tokens found, use the most recent token's timestamp
-        const mostRecentToken = tokens.reduce((latest, token) => {
-          const tokenTime = token.timestamp || token.createdAt || 0;
-          return tokenTime > latest ? tokenTime : latest;
-        }, 0);
+          from_timestamp: new Date(this.lastCheckedTimestamp).toISOString(),
+          to_timestamp: new Date(currentTime).toISOString()
+        });
+        console.log('[DEBUG] Response status:', response.status);
         
-        if (mostRecentToken > 0) {
-          this.lastCheckedTimestamp = mostRecentToken;
-          console.log(`[DEBUG] Using most recent token timestamp: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-        } else {
-          this.lastCheckedTimestamp = currentTime;
-          console.log(`[DEBUG] No valid token timestamps, using current time: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
+        // Process the response
+        if (!response.data) {
+          console.log('[DEBUG] No tokens returned from API');
+          return [];
         }
-      }
 
-      console.log(`[DEBUG] Updated lastCheckedTimestamp to: ${new Date(this.lastCheckedTimestamp).toISOString()}`);
-      console.log(`[DEBUG] Returning ${newTokens.length} new valid tokens`);
-      return newTokens;
-    } catch (error) {
-      console.error('[DEBUG] Error in getNewTokens:', error);
-      return []; // Return empty array on error to continue operation
+        // Log raw response stats
+        console.log('[DEBUG] Raw API response stats:', {
+          status: response.status,
+          hasData: !!response.data,
+          dataType: typeof response.data,
+          isArray: Array.isArray(response.data),
+          dataLength: Array.isArray(response.data) ? response.data.length : 
+                     Array.isArray(response.data?.data) ? response.data.data.length :
+                     Array.isArray(response.data?.result) ? response.data.result.length : 0
+        });
+
+        // Initialize user's seen tokens set if not exists
+        if (!this.lastSeenTokens.has(userId)) {
+          this.lastSeenTokens.set(userId, new Set());
+          console.log(`[DEBUG] Initialized new seen tokens set for user ${userId}`);
+        }
+        const seen = this.lastSeenTokens.get(userId)!;
+        console.log(`[DEBUG] Current seen tokens for user ${userId}: ${seen.size}`);
+        
+        // Handle various response formats
+        const tokens = Array.isArray(response.data) ? response.data : 
+                      response.data?.data ? response.data.data :
+                      response.data?.result ? response.data.result : [];
+
+        if (!Array.isArray(tokens)) {
+          console.log('[DEBUG] Invalid response format - expected array');
+          return [];
+        }
+
+        return tokens;
+
+      } catch (error: any) {
+        const isTimeout = error.code === 'ECONNABORTED' || error.response?.status === 504;
+        const isRateLimit = error.response?.status === 429;
+        
+        console.error(`[ERROR] API request failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
+          code: error.code,
+          status: error.response?.status,
+          message: error.message,
+          isTimeout,
+          isRateLimit
+        });
+
+        if (retryCount === maxRetries) {
+          console.error('[ERROR] Max retries reached, giving up');
+          throw error;
+        }
+
+        // Calculate delay with exponential backoff
+        const delay = baseDelay * Math.pow(2, retryCount);
+        console.log(`[DEBUG] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        retryCount++;
+      }
     }
+
+    // This should never be reached due to the throw in the catch block
+    return [];
   }
 
   private async getMoralisTokens(retryCount = 0): Promise<TokenData[]> {

@@ -53,153 +53,6 @@ export class HeartBot {
     }
   }
 
-  public startMonitoringLoop() {
-    try {
-      if (!this.isInitialized) {
-        console.log('[DEBUG] Bot not fully initialized, cannot start monitoring');
-        return;
-      }
-
-      if (this.monitoringIntervalId) {
-        console.log('[DEBUG] Monitoring loop already running, skipping start');
-        return;
-      }
-
-      // Check if we have any active users before starting
-      const activeUsers = Array.from(this.monitoringEnabled.entries())
-        .filter(([_, enabled]) => enabled)
-        .map(([userId]) => userId);
-
-      if (activeUsers.length === 0) {
-        console.log('[DEBUG] No active users to monitor, not starting loop');
-        return;
-      }
-
-      console.log('[HeartBot] Starting monitoring loop...');
-      this.isRunning = true;
-      
-      // Reset last checked timestamp to start fresh
-      this.pumpFun.resetLastCheckedTimestamp();
-      console.log('[DEBUG] Reset last checked timestamp');
-
-      let isProcessing = false;
-
-      this.monitoringIntervalId = setInterval(async () => {
-        if (isProcessing) {
-          console.log('[DEBUG] Previous cycle still processing, skipping this cycle');
-          return;
-        }
-
-        try {
-          isProcessing = true;
-          const now = new Date().toISOString();
-          console.log(`\n[DEBUG] ===== Starting New Monitoring Cycle at ${now} =====`);
-
-          // Get active users
-          const activeUsers = Array.from(this.monitoringEnabled.entries())
-            .filter(([_, enabled]) => enabled)
-            .map(([userId, _]) => userId);
-
-          if (activeUsers.length === 0) {
-            console.log('[DEBUG] No active users, skipping cycle');
-            isProcessing = false;
-            return;
-          }
-
-          // Process each active user
-          for (const userId of activeUsers) {
-            try {
-              // Double check if user is still enabled
-              if (!this.monitoringEnabled.get(userId)) {
-                console.log(`[DEBUG] Monitoring disabled for user ${userId}, skipping`);
-                continue;
-              }
-
-              console.log(`\n[DEBUG] Processing user ${userId} at ${new Date().toISOString()}`);
-
-              // Get user's active filters
-              const { data: filters, error } = await this.adminClient
-                .from('Filter')
-                .select('*')
-                .eq('user_id', userId)
-                .eq('is_active', true);
-
-              if (error) {
-                console.error(`[DEBUG] Error fetching filters for user ${userId}:`, error);
-                continue;
-              }
-
-              if (!filters || filters.length === 0) {
-                console.log(`[DEBUG] No active filters found for user ${userId}`);
-                continue;
-              }
-
-              // Log filter details
-              console.log(`[DEBUG] Found ${filters.length} active filters for user ${userId}:`);
-              filters.forEach((filter, index) => {
-                console.log(`[DEBUG] Filter ${index + 1}:`, filter);
-              });
-
-              // Fetch new tokens with retry logic
-              console.log(`[DEBUG] Fetching new tokens for user ${userId}...`);
-              const tokens = await this.pumpFun.getNewTokens(userId);
-              console.log(`[DEBUG] Fetched ${tokens.length} new tokens for user ${userId}`);
-
-              if (tokens.length === 0) {
-                console.log(`[DEBUG] No new tokens found for user ${userId}`);
-                continue;
-              }
-
-              let alertsSent = 0;
-              for (const token of tokens) {
-                console.log(`\n[DEBUG] Processing token ${token.address}`);
-                let matched = false;
-                
-                for (const filter of filters) {
-                  try {
-                    if (this.telegram.matchesFilter(token, filter)) {
-                      console.log(`[DEBUG] Token ${token.address} matched filter for user ${userId}. Sending alert...`);
-                      await this.telegram.sendTokenAlert(userId, token);
-                      console.log(`[DEBUG] Alert sent successfully for token ${token.address}`);
-                      matched = true;
-                      alertsSent++;
-                      break;
-                    }
-                  } catch (error) {
-                    console.error(`[DEBUG] Error checking token ${token.address} against filter:`, error);
-                    continue;
-                  }
-                }
-
-                if (!matched) {
-                  console.log(`[DEBUG] Token ${token.address} did not match any filters for user ${userId}`);
-                }
-              }
-
-              console.log(`[DEBUG] Sent ${alertsSent} alerts for user ${userId} in this cycle`);
-
-            } catch (error) {
-              console.error(`[DEBUG] Error processing user ${userId}:`, error);
-              continue;
-            }
-          }
-
-          console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
-        } catch (error) {
-          console.error('[DEBUG] Error in monitoring cycle:', error);
-        } finally {
-          isProcessing = false;
-        }
-      }, 30 * 1000); // Check every 30 seconds
-
-      console.log('[DEBUG] Monitoring loop started successfully');
-    } catch (error) {
-      console.error('[DEBUG] Error starting monitoring loop:', error);
-      this.cleanup();
-    }
-  }
-
-
   // public getMonitoringIntervalId(): NodeJS.Timeout | undefined {
   //   return this.monitoringIntervalId;
   // }
@@ -306,317 +159,315 @@ export class HeartBot {
     }
   }
 
-  // private startTokenMonitoring() {
-  //   console.log('[DEBUG] Starting token monitoring system...');
-    
-  //   // Clear any existing interval
-  //   this.cleanup();
-    
-  //   // Reset last checked timestamp to ensure we get new tokens
-  //   this.pumpFun.resetLastCheckedTimestamp();
+  public startMonitoringLoop() {
+    if (!this.isInitialized) {
+      console.log('[DEBUG] Bot not fully initialized, cannot start monitoring');
+      return;
+    }
+    this.startTokenMonitoring();
+  }
 
-  //   // Start the monitoring loop in the background
-  //   const intervalId = setInterval(async () => {
-  //     console.log('\n[DEBUG] ===== New Monitoring Cycle Started =====');
-  //     console.log('[DEBUG] Bot running status:', this.isRunning);
+  private startTokenMonitoring() {
+    console.log('[DEBUG] Starting token monitoring system...');
+    
+    // Clear any existing interval
+    this.cleanup();
+    
+    // Reset last checked timestamp to ensure we get new tokens
+    this.pumpFun.resetLastCheckedTimestamp();
+
+    if (this.monitoringIntervalId) {
+      console.log('[DEBUG] Monitoring loop already running, skipping start');
+      return;
+    }
+
+    // Check if we have any active users before starting
+    const activeUsers = Array.from(this.monitoringEnabled.entries())
+      .filter(([_, enabled]) => enabled)
+      .map(([userId]) => userId);
+
+    if (activeUsers.length === 0) {
+      console.log('[DEBUG] No active users to monitor, not starting loop');
+      return;
+    }
+
+    console.log('[HeartBot] Starting monitoring loop...');
+    this.isRunning = true;
+
+    // Start the monitoring loop in the background
+    this.monitoringIntervalId = setInterval(async () => {
+      console.log('\n[DEBUG] ===== New Monitoring Cycle Started =====');
+      console.log('[DEBUG] Bot running status:', this.isRunning);
       
-  //     if (!this.isRunning) {
-  //       console.log('[DEBUG] Monitoring is not running, skipping cycle');
-  //       return;
-  //     }
+      if (!this.isRunning) {
+        console.log('[DEBUG] Monitoring is not running, skipping cycle');
+        return;
+      }
 
-  //     // Log active monitoring users
-  //     const activeUsers = Array.from(this.monitoringEnabled.entries())
-  //       .filter(([_, enabled]) => enabled)
-  //       .map(([userId]) => userId);
-  //     console.log('[DEBUG] Active monitoring users:', activeUsers);
+      // Log active monitoring users
+      const activeUsers = Array.from(this.monitoringEnabled.entries())
+        .filter(([_, enabled]) => enabled)
+        .map(([userId]) => userId);
+      console.log('[DEBUG] Active monitoring users:', activeUsers);
 
-  //     if (activeUsers.length === 0) {
-  //       console.log('[DEBUG] No users have monitoring enabled, skipping cycle');
-  //       return;
-  //     }
+      if (activeUsers.length === 0) {
+        console.log('[DEBUG] No users have monitoring enabled, skipping cycle');
+        return;
+      }
 
-  //     try {
-  //       console.log('[DEBUG] Starting token check cycle...');
+      try {
+        console.log('[DEBUG] Starting token check cycle...');
         
-  //       // Get new tokens with retry logic
-  //       let newTokens: TokenData[] = [];
-  //       let retryCount = 0;
-  //       const maxRetries = 3;
-  //       const baseDelay = 2000;
+        // Get new tokens with retry logic
+        let newTokens: TokenData[] = [];
+        let retryCount = 0;
+        const maxRetries = 3;
+        const baseDelay = 2000;
 
-  //       while (retryCount < maxRetries) {
-  //         try {
-  //           console.log('[DEBUG] Attempting to fetch new tokens...');
-  //           newTokens = await this.pumpFun.getNewTokens(activeUsers[0]); // Use first active user's ID
-  //           console.log(`[DEBUG] Successfully fetched ${newTokens.length} new tokens`);
-  //           if (newTokens.length > 0) {
-  //             console.log('[DEBUG] First token sample:', {
-  //               address: newTokens[0].address,
-  //               name: newTokens[0].name,
-  //               marketCap: newTokens[0].marketCap,
-  //               liquidity: newTokens[0].liquidity,
-  //               priceUsd: newTokens[0].priceUsd
-  //             });
-  //           }
-  //           break; // Success, exit retry loop
-  //         } catch (error: any) {
-  //           retryCount++;
+        while (retryCount < maxRetries) {
+          try {
+            console.log('[DEBUG] Attempting to fetch new tokens...');
+            newTokens = await this.pumpFun.getNewTokens(activeUsers[0]); // Use first active user's ID
+            console.log(`[DEBUG] Successfully fetched ${newTokens.length} new tokens`);
+            if (newTokens.length > 0) {
+              console.log('[DEBUG] First token sample:', {
+                address: newTokens[0].address,
+                name: newTokens[0].name,
+                marketCap: newTokens[0].marketCap,
+                liquidity: newTokens[0].liquidity,
+                priceUsd: newTokens[0].priceUsd
+              });
+            }
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            retryCount++;
             
-  //           if (error.response?.status === 429) {
-  //             // Rate limit hit, wait for the specified time plus some buffer
-  //             const retryAfter = (error.response.headers['retry-after'] || 1) * 1000;
-  //             console.log(`[DEBUG] Rate limit hit, waiting ${retryAfter}ms before retry ${retryCount}/${maxRetries}`);
-  //             await new Promise(resolve => setTimeout(resolve, retryAfter + 1000)); // Add 1 second buffer
-  //             continue;
-  //           }
+            if (error.response?.status === 429) {
+              // Rate limit hit, wait for the specified time plus some buffer
+              const retryAfter = (error.response.headers['retry-after'] || 1) * 1000;
+              console.log(`[DEBUG] Rate limit hit, waiting ${retryAfter}ms before retry ${retryCount}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, retryAfter + 1000)); // Add 1 second buffer
+              continue;
+            }
             
-  //           if (retryCount === maxRetries) {
-  //             console.error('[DEBUG] Failed to fetch tokens after', maxRetries, 'attempts:', error);
-  //             return; // Skip this cycle
-  //           }
+            if (retryCount === maxRetries) {
+              console.error('[DEBUG] Failed to fetch tokens after', maxRetries, 'attempts:', error);
+              return; // Skip this cycle
+            }
             
-  //           // For other errors, use exponential backoff
-  //           const delay = baseDelay * Math.pow(2, retryCount - 1);
-  //           console.log(`[DEBUG] Error fetching tokens, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
-  //           await new Promise(resolve => setTimeout(resolve, delay));
-  //         }
-  //       }
+            // For other errors, use exponential backoff
+            const delay = baseDelay * Math.pow(2, retryCount - 1);
+            console.log(`[DEBUG] Error fetching tokens, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
         
-  //       if (newTokens.length === 0) {
-  //         console.log('[DEBUG] No new tokens found in this cycle');
-  //         return;
-  //       }
+        if (newTokens.length === 0) {
+          console.log('[DEBUG] No new tokens found in this cycle');
+          return;
+        }
 
-  //       console.log(`[DEBUG] Processing ${newTokens.length} new tokens`);
+        console.log(`[DEBUG] Processing ${newTokens.length} new tokens`);
         
-  //       // Get all active filters
-  //       let filters;
-  //       try {
-  //         const { data, error } = await this.adminClient
-  //           .from('Filter')
-  //           .select('*, User!inner(*)')
-  //           .eq('is_active', true);
+        // Get all active filters
+        let filters;
+        try {
+          const { data, error } = await this.adminClient
+            .from('Filter')
+            .select('*, User!inner(*)')
+            .eq('is_active', true);
 
-  //         if (error) {
-  //           console.error('[DEBUG] Error fetching filters:', error);
-  //           return;
-  //         }
+          if (error) {
+            console.error('[DEBUG] Error fetching filters:', error);
+            return;
+          }
 
-  //         filters = data;
-  //         console.log(`[DEBUG] Found ${filters.length} active filters`);
+          filters = data;
+          console.log(`[DEBUG] Found ${filters.length} active filters`);
           
-  //         // Log filter details for debugging
-  //         filters.forEach((filter: any, index: number) => {
-  //           console.log(`[DEBUG] Filter ${index + 1}:`, {
-  //             user_id: filter.user_id,
-  //             min_market_cap: filter.min_market_cap,
-  //             max_market_cap: filter.max_market_cap,
-  //             min_liquidity: filter.min_liquidity,
-  //             max_liquidity: filter.max_liquidity,
-  //             is_active: filter.is_active
-  //           });
-  //         });
-  //       } catch (error) {
-  //         console.error('[DEBUG] Error fetching filters:', error);
-  //         return;
-  //       }
+          // Log filter details for debugging
+          filters.forEach((filter: any, index: number) => {
+            console.log(`[DEBUG] Filter ${index + 1}:`, {
+              user_id: filter.user_id,
+              min_market_cap: filter.min_market_cap,
+              max_market_cap: filter.max_market_cap,
+              min_liquidity: filter.min_liquidity,
+              max_liquidity: filter.max_liquidity,
+              is_active: filter.is_active
+            });
+          });
+        } catch (error) {
+          console.error('[DEBUG] Error fetching filters:', error);
+          return;
+        }
 
-  //       if (!filters || filters.length === 0) {
-  //         console.log('[DEBUG] No active filters found');
-  //         return;
-  //       }
+        if (!filters || filters.length === 0) {
+          console.log('[DEBUG] No active filters found');
+          return;
+        }
 
-  //       // Process each token
-  //       for (const token of newTokens) {
-  //         try {
-  //           console.log(`\n[DEBUG] Processing token: ${token.address}`);
-  //           console.log('[DEBUG] Token details:', {
-  //             name: token.name,
-  //             marketCap: token.marketCap,
-  //             liquidity: token.liquidity,
-  //             priceUsd: token.priceUsd
-  //           });
+        // Process each token
+        for (const token of newTokens) {
+          try {
+            console.log(`\n[DEBUG] Processing token: ${token.address}`);
+            console.log('[DEBUG] Token details:', {
+              name: token.name,
+              marketCap: token.marketCap,
+              liquidity: token.liquidity,
+              priceUsd: token.priceUsd
+            });
 
-  //           // Calculate marketCap if not provided
-  //           if (!token.marketCap && token.priceUsd && token.liquidity) {
-  //             // Estimate marketCap as 2x liquidity for new tokens
-  //             token.marketCap = token.liquidity * 2;
-  //             console.log(`[DEBUG] Calculated marketCap for ${token.address}: ${token.marketCap}`);
-  //           }
+            // Calculate marketCap if not provided
+            if (!token.marketCap && token.priceUsd && token.liquidity) {
+              // Estimate marketCap as 2x liquidity for new tokens
+              token.marketCap = token.liquidity * 2;
+              console.log(`[DEBUG] Calculated marketCap for ${token.address}: ${token.marketCap}`);
+            }
 
-  //           // Validate token data
-  //           if (!token.liquidity) {
-  //             console.log(`[DEBUG] Skipping token ${token.address} - missing liquidity data`);
-  //             continue;
-  //           }
+            // Validate token data
+            if (!token.liquidity) {
+              console.log(`[DEBUG] Skipping token ${token.address} - missing liquidity data`);
+              continue;
+            }
 
-  //           if (!token.marketCap) {
-  //             console.log(`[DEBUG] Skipping token ${token.address} - missing marketCap data and unable to calculate`);
-  //             continue;
-  //           }
+            if (!token.marketCap) {
+              console.log(`[DEBUG] Skipping token ${token.address} - missing marketCap data and unable to calculate`);
+              continue;
+            }
 
-  //           // Check each filter
-  //           for (const filter of filters) {
-  //             try {
-  //               // Only send alerts to users who have monitoring enabled
-  //               if (!this.monitoringEnabled.get(filter.user_id)) {
-  //                 console.log(`[DEBUG] Monitoring disabled for user ${filter.user_id}`);
-  //                 continue;
-  //               }
+            // Check each filter
+            for (const filter of filters) {
+              try {
+                // Only send alerts to users who have monitoring enabled
+                if (!this.monitoringEnabled.get(filter.user_id)) {
+                  console.log(`[DEBUG] Monitoring disabled for user ${filter.user_id}`);
+                  continue;
+                }
 
-  //               // Skip filters that require Dexscreener data
-  //               if (filter.min_holders || filter.max_holders || 
-  //                   filter.max_dev_tokens || filter.min_contract_age) {
-  //                 console.log(`[DEBUG] Skipping filter for ${token.address} - requires Dexscreener data`);
-  //                 continue;
-  //               }
+                // Skip filters that require Dexscreener data
+                if (filter.min_holders || filter.max_holders || 
+                    filter.max_dev_tokens || filter.min_contract_age) {
+                  console.log(`[DEBUG] Skipping filter for ${token.address} - requires Dexscreener data`);
+                  continue;
+                }
 
-  //               console.log(`[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
-  //               console.log('[DEBUG] Token data:', {
-  //                 liquidity: token.liquidity,
-  //                 marketCap: token.marketCap,
-  //                 holdersCount: token.holdersCount,
-  //                 devTokensPercentage: token.devTokensPercentage,
-  //                 contractAge: token.contractAge,
-  //                 tradingEnabled: token.tradingEnabled
-  //               });
-  //               console.log('[DEBUG] Filter criteria:', {
-  //                 min_market_cap: filter.min_market_cap,
-  //                 max_market_cap: filter.max_market_cap,
-  //                 min_liquidity: filter.min_liquidity,
-  //                 max_liquidity: filter.max_liquidity,
-  //                 trading_enabled: filter.trading_enabled
-  //               });
+                console.log(`[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
+                console.log('[DEBUG] Token data:', {
+                  liquidity: token.liquidity,
+                  marketCap: token.marketCap,
+                  holdersCount: token.holdersCount,
+                  devTokensPercentage: token.devTokensPercentage,
+                  contractAge: token.contractAge,
+                  tradingEnabled: token.tradingEnabled
+                });
+                console.log('[DEBUG] Filter criteria:', {
+                  min_market_cap: filter.min_market_cap,
+                  max_market_cap: filter.max_market_cap,
+                  min_liquidity: filter.min_liquidity,
+                  max_liquidity: filter.max_liquidity,
+                  trading_enabled: filter.trading_enabled
+                });
 
-  //               const matches = this.matchesFilter(token, filter);
-  //               if (matches) {
-  //                 console.log(`[DEBUG] Token ${token.address} matches filter for user ${filter.user_id}`);
-  //                 await this.telegram.sendTokenAlert(filter.user_id, token);
-  //                 console.log(`[DEBUG] Alert sent to user ${filter.user_id} for token ${token.address}`);
-  //               } else {
-  //                 console.log(`[DEBUG] Token ${token.address} does not match filter for user ${filter.user_id}`);
-  //               }
-  //             } catch (error) {
-  //               console.error(`[DEBUG] Error processing filter for user ${filter.user_id}:`, error);
-  //               continue;
-  //             }
-  //           }
-  //         } catch (error) {
-  //           console.error(`[DEBUG] Error processing token ${token.address}:`, error);
-  //           continue;
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error('[DEBUG] Error in monitoring cycle:', error);
-  //       // Don't throw the error, just log it and continue
-  //     }
-  //     console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
-  //   }, 60000); // Check every 60 seconds    // Store interval ID for cleanup
-  //   this.monitoringIntervalId = intervalId;
-  //   console.log('[DEBUG] Token monitoring system started successfully');
-  // }
+                if (this.matchesFilter(token, filter)) {
+                  console.log(`[DEBUG] Token ${token.address} matches filter for user ${filter.user_id}`);
+                  await this.telegram.sendTokenAlert(filter.user_id, token);
+                  console.log(`[DEBUG] Alert sent to user ${filter.user_id} for token ${token.address}`);
+                } else {
+                  console.log(`[DEBUG] Token ${token.address} does not match filter for user ${filter.user_id}`);
+                }
+              } catch (error) {
+                console.error(`[DEBUG] Error processing filter for user ${filter.user_id}:`, error);
+                continue;
+              }
+            }
+          } catch (error) {
+            console.error(`[DEBUG] Error processing token ${token.address}:`, error);
+            continue;
+          }
+        }
+      } catch (error) {
+        console.error('[DEBUG] Error in monitoring cycle:', error);
+        // Don't throw the error, just log it and continue
+      }
+      console.log('[DEBUG] ===== Monitoring Cycle Completed =====\n');
+    }, 60000); // Check every 60 seconds
+    
+    console.log('[DEBUG] Token monitoring system started successfully');
+  }
+  
+  private matchesFilter(token: TokenData, filter: any): boolean {
+    console.log(`\n[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
+    console.log('Token data:', {
+      liquidity: token.liquidity,
+      marketCap: token.marketCap,
+      holdersCount: token.holdersCount,
+      devTokensPercentage: token.devTokensPercentage,
+      contractAge: token.contractAge,
+      tradingEnabled: token.tradingEnabled
+    });
+    console.log('Filter criteria:', {
+      min_market_cap: filter.min_market_cap,
+      max_market_cap: filter.max_market_cap,
+      min_liquidity: filter.min_liquidity,
+      max_liquidity: filter.max_liquidity,
+      trading_enabled: filter.trading_enabled
+    });
 
-  // private matchesFilter(token: TokenData, filter: any): boolean {
-  //   console.log(`\n[DEBUG] Checking token ${token.address} against filter for user ${filter.user_id}`);
-  //   console.log('Token data:', {
-  //     liquidity: token.liquidity,
-  //     marketCap: token.marketCap,
-  //     holdersCount: token.holdersCount,
-  //     devTokensPercentage: token.devTokensPercentage,
-  //     contractAge: token.contractAge,
-  //     tradingEnabled: token.tradingEnabled
-  //   });
-  //   console.log('Filter criteria:', {
-  //     min_market_cap: filter.min_market_cap,
-  //     max_market_cap: filter.max_market_cap,
-  //     min_liquidity: filter.min_liquidity,
-  //     max_liquidity: filter.max_liquidity,
-  //     trading_enabled: filter.trading_enabled
-  //   });
+    // Market cap filters
+    if (filter.min_market_cap && token.marketCap < filter.min_market_cap) {
+      console.log(`❌ Market cap ${token.marketCap} < min ${filter.min_market_cap}`);
+      return false;
+    }
+    if (filter.max_market_cap && token.marketCap > filter.max_market_cap) {
+      console.log(`❌ Market cap ${token.marketCap} > max ${filter.max_market_cap}`);
+      return false;
+    }
 
-  //   // Market cap filters
-  //   if (filter.min_market_cap && token.marketCap < filter.min_market_cap) {
-  //     console.log(`❌ Market cap ${token.marketCap} < min ${filter.min_market_cap}`);
-  //     return false;
-  //   }
-  //   if (filter.max_market_cap && token.marketCap > filter.max_market_cap) {
-  //     console.log(`❌ Market cap ${token.marketCap} > max ${filter.max_market_cap}`);
-  //     return false;
-  //   }
+    // Liquidity filters
+    if (filter.min_liquidity && token.liquidity < filter.min_liquidity) {
+      console.log(`❌ Liquidity ${token.liquidity} < min ${filter.min_liquidity}`);
+      return false;
+    }
+    if (filter.max_liquidity && token.liquidity > filter.max_liquidity) {
+      console.log(`❌ Liquidity ${token.liquidity} > max ${filter.max_liquidity}`);
+      return false;
+    }
 
-  //   // Liquidity filters
-  //   if (filter.min_liquidity && token.liquidity < filter.min_liquidity) {
-  //     console.log(`❌ Liquidity ${token.liquidity} < min ${filter.min_liquidity}`);
-  //     return false;
-  //   }
-  //   if (filter.max_liquidity && token.liquidity > filter.max_liquidity) {
-  //     console.log(`❌ Liquidity ${token.liquidity} > max ${filter.max_liquidity}`);
-  //     return false;
-  //   }
+    // Holders filters
+    if (filter.min_holders && token.holdersCount < filter.min_holders) {
+      console.log(`❌ Holders ${token.holdersCount} < min ${filter.min_holders}`);
+      return false;
+    }
+    if (filter.max_holders && token.holdersCount > filter.max_holders) {
+      console.log(`❌ Holders ${token.holdersCount} > max ${filter.max_holders}`);
+      return false;
+    }
 
-  //   // Holders filters
-  //   if (filter.min_holders && token.holdersCount < filter.min_holders) {
-  //     console.log(`❌ Holders ${token.holdersCount} < min ${filter.min_holders}`);
-  //     return false;
-  //   }
-  //   if (filter.max_holders && token.holdersCount > filter.max_holders) {
-  //     console.log(`❌ Holders ${token.holdersCount} > max ${filter.max_holders}`);
-  //     return false;
-  //   }
+    // Dev tokens filter
+    if (filter.max_dev_tokens && token.devTokensPercentage && token.devTokensPercentage > filter.max_dev_tokens) {
+      console.log(`❌ Dev tokens ${token.devTokensPercentage}% > max ${filter.max_dev_tokens}%`);
+      return false;
+    }
 
-  //   // Dev tokens filter
-  //   if (filter.max_dev_tokens && token.devTokensPercentage && token.devTokensPercentage > filter.max_dev_tokens) {
-  //     console.log(`❌ Dev tokens ${token.devTokensPercentage}% > max ${filter.max_dev_tokens}%`);
-  //     return false;
-  //   }
+    // Contract age filter
+    if (filter.min_contract_age && token.contractAge < filter.min_contract_age) {
+      console.log(`❌ Contract age ${token.contractAge} < min ${filter.min_contract_age}`);
+      return false;
+    }
 
-  //   // Contract age filter
-  //   if (filter.min_contract_age && token.contractAge < filter.min_contract_age) {
-  //     console.log(`❌ Contract age ${token.contractAge} < min ${filter.min_contract_age}`);
-  //     return false;
-  //   }
+    // Trading status filter
+    if (filter.trading_enabled !== null && filter.trading_enabled !== undefined) {
+      console.log(`[DEBUG] Checking trading status - Token: ${token.tradingEnabled}, Filter: ${filter.trading_enabled}`);
+      if (token.tradingEnabled !== filter.trading_enabled) {
+        console.log(`❌ Trading status ${token.tradingEnabled} != required ${filter.trading_enabled}`);
+        return false;
+      }
+    }
 
-  //   // Trading status filter
-  //   if (filter.trading_enabled !== null && filter.trading_enabled !== undefined) {
-  //     console.log(`[DEBUG] Checking trading status - Token: ${token.tradingEnabled}, Filter: ${filter.trading_enabled}`);
-  //     if (token.tradingEnabled !== filter.trading_enabled) {
-  //       console.log(`❌ Trading status ${token.tradingEnabled} != required ${filter.trading_enabled}`);
-  //       return false;
-  //     }
-  //   }
-
-  //   // If we get here, the token matches all specified filters
-  //   console.log(`✅ Token ${token.address} matches all filters for user ${filter.user_id}`);
-  //   return true;
-  // }
-
-  // async stop() {
-  //   try {
-  //     console.log('[DEBUG] Stopping HeartBot...');
-      
-  //     // Stop Telegram bot
-  //     if (this.telegram) {
-  //       await this.telegram.stop();
-  //     }
-      
-  //     // Stop Fastify server if running
-  //     if (this.serverStarted) {
-  //       await this.server.close();
-  //       this.serverStarted = false;
-  //     }
-      
-  //     // Cleanup monitoring
-  //     this.cleanup();
-      
-  //     this.isRunning = false;
-  //     this.initializationPromise = null;
-  //     console.log('[DEBUG] HeartBot stopped successfully');
-  //   } catch (error) {
-  //     console.error('[DEBUG] Error stopping HeartBot:', error);
-  //     throw error;
-  //   }
-  // }
+    // If we get here, the token matches all specified filters
+    console.log(`✅ Token ${token.address} matches all filters for user ${filter.user_id}`);
+    return true;
+  }
 
   // Add methods to control monitoring
   enableMonitoring(userId: string) {
